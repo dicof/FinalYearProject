@@ -112,7 +112,6 @@ def get_roads_coords_query(user_input, distanceAround):
     that are secondary or tertiary'''
     '''includes distance parameter for around feature'''
     prefix3 = """[out:json][timeout:25];(way["highway"="secondary"](around:"""
-
     infix3 = """ way["highway"="tertiary"](around:"""
     suffix3 = """);out geom;"""
     q = str(distanceAround) + ', ' + str(user_input[0]) + ', ' + str(user_input[1]) + ');'
@@ -195,6 +194,57 @@ def return_suitable_location(coords):
     return newStopCoords
 
 
-'''Test New Feature: Search within 150 metres'''
+'''Test New Feature: Search within 150 metres, find if any road types, then prioritise
+Primary, then secondary, then tertiary, and then finally 2 lane residential
+'''
+def return_suitable_location2(coords):
+
+    start = time.time()
+    #search distance starting at 150
+    searchDistance = 100
+    newStopCoords = []
+    distanceMoved = 0
+    json_data = []
+    overpass_url = "http://overpass-api.de/api/interpreter"
+    query = get_roads_coords_query(coords, searchDistance)
+    response = requests.get(overpass_url, params={'data': query})
+    satisfied = False
+    while satisfied == False:
+        try:
+            print(response.json())
+            json_data = response.json()
+            if not json_data['elements']:
+                # no response, no suitable road, move out and try again
+                satisfied = True
+                print('No suitable location for ' + str(coords[0]) + ', ' + str(coords[1]) + ' within ' + str(
+                    searchDistance) + 'm.')
+            else:
+                # A response: Check for Primary, then secondary, then tertiary, then two lane residential
+                #\\TODO: Check for pavement
+
+                # print('got here: elements returned')
+                satisfied = True
+                newStopCoords = closest_point(coords, json_data['elements'][0]['geometry'])
+                distanceMoved = geopy.distance.distance(coords, newStopCoords).m
+                print(
+                    'Stop has been moved ' + str(distanceMoved) + 'm, search distance = ' + str(searchDistance) + 'm.')
+        except ValueError:
+            # Currently operating under the assumption that the API needs a second to breathe
+            # So I'm just going to try request it again and see what happens
+            print('Json Decode Error')
+
+        if searchDistance > DISTANCEALLOWED:
+            # print('got here: search > Distance Allowed')
+            print("Wal")
+
+
+
+
+    end = time.time()
+
+    print(end - start)
+    print(newStopCoords)
+    newStopCoords.append(distanceMoved)
+    return newStopCoords
 
 
