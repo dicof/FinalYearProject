@@ -111,11 +111,12 @@ def get_roads_coords_query(user_input, distanceAround):
     '''Takes in user input of coordinates and returns the coordinates of roads
     that are secondary or tertiary'''
     '''includes distance parameter for around feature'''
-    prefix3 = """[out:json][timeout:25];(way["highway"="secondary"](around:"""
-    infix3 = """ way["highway"="tertiary"](around:"""
-    suffix3 = """);out geom;"""
+    prefix = """[out:json][timeout:25];(way["highway"="secondary"](around:"""
+    infix1 = """ way["highway"="tertiary"](around:"""
+    infix2 = """ way["highway"="residential"](around:"""
+    suffix = """);out geom;"""
     q = str(distanceAround) + ', ' + str(user_input[0]) + ', ' + str(user_input[1]) + ');'
-    built_query = prefix3 + q + infix3 + q + suffix3
+    built_query = prefix + q + infix1 + q + infix2 + q + suffix
     return built_query
 
 
@@ -201,30 +202,75 @@ def return_suitable_location2(coords):
 
     start = time.time()
     #search distance starting at 150
-    searchDistance = 100
+    searchDistance = 200
     newStopCoords = []
     distanceMoved = 0
     json_data = []
     overpass_url = "http://overpass-api.de/api/interpreter"
-    query = get_roads_coords_query(coords, searchDistance)
-    response = requests.get(overpass_url, params={'data': query})
+
     satisfied = False
     while satisfied == False:
         try:
-            print(response.json())
+            query = get_roads_coords_query(coords, searchDistance)
+            response = requests.get(overpass_url, params={'data': query})
+            #print(response.json())
             json_data = response.json()
             if not json_data['elements']:
                 # no response, no suitable road, move out and try again
                 satisfied = True
                 print('No suitable location for ' + str(coords[0]) + ', ' + str(coords[1]) + ' within ' + str(
                     searchDistance) + 'm.')
-            else:
-                # A response: Check for Primary, then secondary, then tertiary, then two lane residential
-                #\\TODO: Check for pavement
 
-                # print('got here: elements returned')
+            else:
+                # A response: Check for secondary, then tertiary, then two lane residential
+                #\\TODO: Check for pavement
+                numberRoads = len(json_data['elements']) #This minus one for last index
+                priorityMeasure = 0
+                chosenIndex = -1
+                for i in range(0, numberRoads):
+                    currentRoad = json_data['elements'][i]['tags']
+                    typeRoad = json_data['elements'][i]['tags']['highway']
+                    currentPriority = 0
+                    if (typeRoad == "residential"):
+                        #check if access is private, and if 2 lane, and \\TODO: paved surface
+                        if 'access' in currentRoad:
+                            if currentRoad['access'] == 'private':
+                                #Not suitable as a road.
+                                print("private road")
+                            else:
+                                if int(currentRoad['lanes']) > 1:
+                                    #suitable road
+                                    currentRoadPriority = 1
+                                    if currentRoadPriority > priorityMeasure:
+                                        priorityMeasure = currentRoadPriority
+                                        chosenIndex = i
+                    elif (typeRoad == "tertiary"):
+                        if 'access' in currentRoad:
+                            if currentRoad['access'] == 'private':
+                                #Not suitable as a road.
+                                print("private road")
+                            else:
+                                if int(currentRoad['lanes']) > 1:
+                                    #suitable road
+                                    currentRoadPriority = 2
+                                    if currentRoadPriority > priorityMeasure:
+                                        priorityMeasure = currentRoadPriority
+                                        chosenIndex = i
+                    elif (typeRoad == "secondary"):
+                        if 'access' in currentRoad:
+                            if currentRoad['access'] == 'private':
+                                #Not suitable as a road.
+                                print("private road")
+                            else:
+                                if int(currentRoad['lanes']) > 1:
+                                    #suitable road
+                                    currentRoadPriority = 3
+                                    if currentRoadPriority > priorityMeasure:
+                                        priorityMeasure = currentRoadPriority
+                                        chosenIndex = i
+
                 satisfied = True
-                newStopCoords = closest_point(coords, json_data['elements'][0]['geometry'])
+                newStopCoords = closest_point(coords, json_data['elements'][chosenIndex]['geometry'])
                 distanceMoved = geopy.distance.distance(coords, newStopCoords).m
                 print(
                     'Stop has been moved ' + str(distanceMoved) + 'm, search distance = ' + str(searchDistance) + 'm.')
@@ -233,9 +279,6 @@ def return_suitable_location2(coords):
             # So I'm just going to try request it again and see what happens
             print('Json Decode Error')
 
-        if searchDistance > DISTANCEALLOWED:
-            # print('got here: search > Distance Allowed')
-            print("Wal")
 
 
 
