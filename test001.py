@@ -46,13 +46,11 @@ movedStopsDF.to_csv("movedStops2.csv")
 studentsDF = pd.DataFrame(students)
 studentsDF.insert(3, "Stop", y_kmeans)
 
-# Probably should create a matrix of distance from
-# each student to each bus stop
-# Graphhopper?
-# For now, coordinates
-# Across rows, busStops
-# across column, students
+
 #\\TODO: Clean this up to only use DFs or nps
+
+'''
+
 studentsToStops = np.empty((len(studentsDF), len(movedStopsDF)), dtype=int)
 # index in these lists = index in students
 closestStopForStudent = []
@@ -79,3 +77,42 @@ for i in range(0, len(studentsDF)):
 
     closestStopForStudent.append(closestStop)
     studentCommute.append(minDist)
+    
+    
+'''
+
+# Reassign students to closest stop
+# Get distance from student to each stop
+# save closest stop, and distance
+# using students, fixedCoords
+newStops = []
+newDistances = []
+#newStops[i] and newDistances[i] represent the new information for students[i]
+for i in range(0,len(students)):
+    studentAddress = students[i, 1:3] #Maybe?
+    closestStopIndex = -1
+    closestDistance = -1
+    for j in range(0, len(fixedCoords)):
+        currentStop = fixedCoords[j][0:2]
+        if fixedCoords[j][2] != -1:
+            currentDist = geopy.distance.distance(studentAddress, currentStop).m
+            if closestDistance == -1:
+                closestDistance = currentDist
+                closestStopIndex = j
+            elif currentDist < closestDistance:
+                closestDistance = currentDist
+                closestStopIndex = j
+
+    newStops.append(closestStopIndex)
+    newDistances.append(closestDistance)
+
+maxWalkingDistance = max(newDistances)
+total = 0
+for i in range(0, len(newDistances)):
+    total = total + newDistances[i]
+averageWalkingDistance = total/len(newDistances)
+
+# Drop any bus stop that has -1 in distance moved column
+movedStopsDF = movedStopsDF[movedStopsDF[2] != -1]
+
+# ready to send to routing
