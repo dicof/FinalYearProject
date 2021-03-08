@@ -15,7 +15,7 @@ import json
 import numpy as np
 #routing002: Test to remove main()
 
-import clustering003
+import test001
 
 import distanceMat001
 
@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 
 
 
-busStops = clustering003.busStops
+busStops = test001.busStops
 
 #depot = (44.65163190605642, -63.61516155604698) #6670 Bayer's Road, pretty far away
 depot = (44.7207799,	-63.6994861) #Charles P Allen High School, from Garry's files
@@ -146,7 +146,7 @@ for i in range(len(solutionDict)):
         f = (busStops[(solutionDict[i][j]-1),0], busStops[(solutionDict[i][j]-1),1])
         routes[i].append(f)
     routes[i] = np.array(routes[i])
-
+'''
 plt.scatter(-63.6994861, 44.7207799, c='green', s=200, alpha = 0.25)
 plt.scatter(routes[4][:,1], routes[4][:,0], c='blue', s=30)
 plt.scatter(routes[5][:,1], routes[5][:,0], c='red', s=30)
@@ -159,6 +159,7 @@ plt.scatter(routes[11][:,1], routes[11][:,0], c='lime', s=30)
 plt.scatter(routes[12][:,1], routes[12][:,0], c='indigo', s=30)
 plt.scatter(routes[13][:,1], routes[13][:,0], c='olive', s=30)
 plt.scatter(routes[14][:,1], routes[14][:,0], c='peru', s=30)
+'''
 
 #count mention of each stop
 countStopMentions = [0]*(len(busStops))

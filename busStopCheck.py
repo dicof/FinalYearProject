@@ -114,9 +114,10 @@ def get_roads_coords_query(user_input, distanceAround):
     prefix = """[out:json][timeout:25];(way["highway"="secondary"](around:"""
     infix1 = """ way["highway"="tertiary"](around:"""
     infix2 = """ way["highway"="residential"](around:"""
+    infix3 = """ node["highway"="turning_circle"](around:"""
     suffix = """);out geom;"""
     q = str(distanceAround) + ', ' + str(user_input[0]) + ', ' + str(user_input[1]) + ');'
-    built_query = prefix + q + infix1 + q + infix2 + q + suffix
+    built_query = prefix + q + infix1 + q + infix2 + q + infix3 + q + suffix
     return built_query
 
 
@@ -227,49 +228,70 @@ def return_suitable_location2(coords):
                 numberRoads = len(json_data['elements']) #This minus one for last index
                 priorityMeasure = 0
                 chosenIndex = -1
+                turningCircleFlag = False
+                turningCircleCoords = []
                 for i in range(0, numberRoads):
                     currentRoad = json_data['elements'][i]['tags']
+                    print(json_data['elements'][i])
                     typeRoad = json_data['elements'][i]['tags']['highway']
-                    currentPriority = 0
+                    print(currentRoad)
+                    currentRoadPriority = 0
                     if (typeRoad == "residential"):
-                        #check if access is private, and if 2 lane, and \\TODO: paved surface
+                        #check if access is private, and if 2 lane, and \\TODO: paved surface and TURNING CIRCLE
                         if 'access' in currentRoad:
                             if currentRoad['access'] == 'private':
                                 #Not suitable as a road.
                                 print("private road")
-                            else:
-                                if int(currentRoad['lanes']) > 1:
-                                    #suitable road
-                                    currentRoadPriority = 1
-                                    if currentRoadPriority > priorityMeasure:
-                                        priorityMeasure = currentRoadPriority
-                                        chosenIndex = i
-                    elif (typeRoad == "tertiary"):
+                        else:
+                            if int(currentRoad['lanes']) > 1:
+                                #suitable road
+                                currentRoadPriority = 1
+                                if currentRoadPriority > priorityMeasure:
+                                    priorityMeasure = currentRoadPriority
+                                    chosenIndex = i
+                    elif typeRoad == "turning_circle":
+                        # A turning circle has been detected. This might only become relevant
+                        # If a residential road is chosen.
+                        # Store the co-ordinates of the turning circle and flag that a turning circle is present
+                        turningCircleFlag = True
+                        print("turning circle found")
+                        turningCircleCoords = [json_data['elements'][i]['lat'], json_data['elements'][i]['lon']]
+                    elif typeRoad == "tertiary":
+                        print("tertiary road")
                         if 'access' in currentRoad:
                             if currentRoad['access'] == 'private':
-                                #Not suitable as a road.
-                                print("private road")
-                            else:
-                                if int(currentRoad['lanes']) > 1:
-                                    #suitable road
-                                    currentRoadPriority = 2
-                                    if currentRoadPriority > priorityMeasure:
-                                        priorityMeasure = currentRoadPriority
-                                        chosenIndex = i
+                                # Not suitable as a road.
+                                print("private tertiary road")
+                        else:
+                            if int(currentRoad['lanes']) > 1:
+                                #suitable road
+                                #print("suitable tertiary road")
+                                currentRoadPriority = 2
+                                if currentRoadPriority > priorityMeasure:
+                                    priorityMeasure = currentRoadPriority
+                                    chosenIndex = i
+                                    #print("Chosen Index: " + str(chosenIndex))
                     elif (typeRoad == "secondary"):
                         if 'access' in currentRoad:
                             if currentRoad['access'] == 'private':
                                 #Not suitable as a road.
                                 print("private road")
-                            else:
-                                if int(currentRoad['lanes']) > 1:
-                                    #suitable road
-                                    currentRoadPriority = 3
-                                    if currentRoadPriority > priorityMeasure:
-                                        priorityMeasure = currentRoadPriority
-                                        chosenIndex = i
+                        else:
+                            if int(currentRoad['lanes']) > 1:
+                                #suitable road
+                                currentRoadPriority = 3
+                                if currentRoadPriority > priorityMeasure:
+                                    priorityMeasure = currentRoadPriority
+                                    chosenIndex = i
 
                 satisfied = True
+                # In case of residential road, turning circle must be dealt with
+                # aim is to choose point on road that is furthest from the turning circle
+                print(str(priorityMeasure) + " is priority Measure")
+                if priorityMeasure == 1 & turningCircleFlag == True:
+                    # turning circle present and residential road chosen: choose point furthest from circle
+                    print("Went in here")
+                    newStopCoords = furthest_point_from_turning_circle(turningCircleCoords, json_data['elements'][chosenIndex]['geometry'])
                 newStopCoords = closest_point(coords, json_data['elements'][chosenIndex]['geometry'])
                 distanceMoved = geopy.distance.distance(coords, newStopCoords).m
                 print(
@@ -291,3 +313,23 @@ def return_suitable_location2(coords):
     return newStopCoords
 
 
+def furthest_point_from_turning_circle(turningCircle, way):
+    '''
+    This function will take a road and the co-ordinates of a turning circle
+    It will return the co-ordinates of a point on that road that is as far away from the turning circle as possible
+    which can be assumed to be the point where the cul-de-sac links with the more major road
+    '''
+
+    #\\TODO: This function works perfectly, just have to figure out a method to ensure it measures off a suitable road
+    maxDist = 0
+    maxDistIndex = -1
+    for i in range(0, len(way)):
+        currentPoint = [way[i]['lat'], way[i]['lon']]
+        currentDist = geopy.distance.distance(turningCircle, currentPoint).m
+        if currentDist > maxDist:
+            maxDist = currentDist
+            maxDistIndex = i
+
+
+
+    return [way[maxDistIndex]['lat'], way[maxDistIndex]['lon']]

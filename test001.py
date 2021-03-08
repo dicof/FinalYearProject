@@ -38,7 +38,7 @@ for i in range(0, len(busStops)):
 end = time.time()
 print(end - start)
 movedStopsDF = pd.DataFrame(fixedCoords)
-movedStopsDF.to_csv("movedStops2.csv")
+movedStopsDF.to_csv("movedStops3.csv")
 
 
 #Take any stops that have been successfully moved,
@@ -47,39 +47,6 @@ studentsDF = pd.DataFrame(students)
 studentsDF.insert(3, "Stop", y_kmeans)
 
 
-#\\TODO: Clean this up to only use DFs or nps
-
-'''
-
-studentsToStops = np.empty((len(studentsDF), len(movedStopsDF)), dtype=int)
-# index in these lists = index in students
-closestStopForStudent = []
-studentCommute = []
-for i in range(0, len(studentsDF)):
-    # For each student, compute distance between student
-    # and each stop
-    minDist = -1
-    closestStop = -1
-    for j in range(0, len(movedStopsDF)):
-        if fixedCoords[0][2] != -1:
-            currentDist = geopy.distance.distance(students[i, 1:3], fixedCoords[j][0:2]).m
-            studentsToStops[i, j] = int(currentDist)
-            if minDist == -1:
-                minDist = currentDist
-                closestStop = j
-
-            if currentDist < minDist:
-                minDist = currentDist
-                closestStop = j
-        else:
-            # Stop is not on road network
-            studentsToStops[i,j] = -1
-
-    closestStopForStudent.append(closestStop)
-    studentCommute.append(minDist)
-    
-    
-'''
 
 # Reassign students to closest stop
 # Get distance from student to each stop
@@ -116,3 +83,4 @@ averageWalkingDistance = total/len(newDistances)
 movedStopsDF = movedStopsDF[movedStopsDF[2] != -1]
 
 # ready to send to routing
+movedStopsCoords = movedStopsDF.values
