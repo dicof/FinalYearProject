@@ -115,9 +115,10 @@ def get_roads_coords_query(user_input, distanceAround):
     infix1 = """ way["highway"="tertiary"](around:"""
     infix2 = """ way["highway"="residential"](around:"""
     infix3 = """ node["highway"="turning_circle"](around:"""
+    infix4 = """ way["highway"="primary"](around:"""
     suffix = """);out geom;"""
     q = str(distanceAround) + ', ' + str(user_input[0]) + ', ' + str(user_input[1]) + ');'
-    built_query = prefix + q + infix1 + q + infix2 + q + infix3 + q + suffix
+    built_query = prefix + q + infix1 + q + infix2 + q + infix3 + q + infix4 + q + suffix
     return built_query
 
 
@@ -203,7 +204,7 @@ def return_suitable_location2(coords):
 
     start = time.time()
     #search distance starting at 150
-    searchDistance = 200
+    searchDistance = 250
     newStopCoords = []
     distanceMoved = 0
     json_data = []
@@ -243,8 +244,22 @@ def return_suitable_location2(coords):
                                 #Not suitable as a road.
                                 print("private road")
                         else:
-                            if int(currentRoad['lanes']) > 1:
-                                #suitable road
+                            if 'lanes' in currentRoad:
+                                if int(currentRoad['lanes']) > 1:
+                                    # suitable road
+                                    currentRoadPriority = 1
+                                    if currentRoadPriority > priorityMeasure:
+                                        priorityMeasure = currentRoadPriority
+                                        chosenIndex = i
+                                else:
+                                    # unsuitable road, one lane
+                                    print("one lane")
+                            elif 'oneway' in currentRoad:
+                                # one way, might be an issue
+                                print("One way, ignore for now") #\\TODO: make more sense of this
+                            else:
+                                # no lanes tag on residential road, rare, take as suitable road
+                                print("No lanes tag, residential road")
                                 currentRoadPriority = 1
                                 if currentRoadPriority > priorityMeasure:
                                     priorityMeasure = currentRoadPriority
@@ -263,27 +278,47 @@ def return_suitable_location2(coords):
                                 # Not suitable as a road.
                                 print("private tertiary road")
                         else:
-                            if int(currentRoad['lanes']) > 1:
-                                #suitable road
-                                #print("suitable tertiary road")
+                            if 'lanes' in currentRoad:
+                                if int(currentRoad['lanes']) > 1:
+                                    #suitable road
+                                    #print("suitable tertiary road")
+                                    currentRoadPriority = 2
+                                    if currentRoadPriority > priorityMeasure:
+                                        priorityMeasure = currentRoadPriority
+                                        chosenIndex = i
+                                        #print("Chosen Index: " + str(chosenIndex))
+                            else:
+                                # no lanes on road, but as tertiary, should be fine
                                 currentRoadPriority = 2
                                 if currentRoadPriority > priorityMeasure:
                                     priorityMeasure = currentRoadPriority
                                     chosenIndex = i
-                                    #print("Chosen Index: " + str(chosenIndex))
+                                    # print("Chosen Index: " + str(chosenIndex))
                     elif (typeRoad == "secondary"):
                         if 'access' in currentRoad:
                             if currentRoad['access'] == 'private':
                                 #Not suitable as a road.
                                 print("private road")
                         else:
-                            if int(currentRoad['lanes']) > 1:
-                                #suitable road
+                            if 'lanes' in currentRoad:
+                                if int(currentRoad['lanes']) > 1:
+                                    #suitable road
+                                    currentRoadPriority = 3
+                                    if currentRoadPriority > priorityMeasure:
+                                        priorityMeasure = currentRoadPriority
+                                        chosenIndex = i
+                            else:
+                                # no lanes tag, but as secondary, should be fine
                                 currentRoadPriority = 3
                                 if currentRoadPriority > priorityMeasure:
                                     priorityMeasure = currentRoadPriority
                                     chosenIndex = i
-
+                    elif typeRoad == "primary":
+                        currentRoadPriority = 4
+                        print("Primary road chosen")
+                        if currentRoadPriority > priorityMeasure:
+                            priorityMeasure = currentRoadPriority
+                            chosenIndex = i
                 satisfied = True
                 # In case of residential road, turning circle must be dealt with
                 # aim is to choose point on road that is furthest from the turning circle
@@ -292,10 +327,15 @@ def return_suitable_location2(coords):
                     # turning circle present and residential road chosen: choose point furthest from circle
                     print("Went in here")
                     newStopCoords = furthest_point_from_turning_circle(turningCircleCoords, json_data['elements'][chosenIndex]['geometry'])
-                newStopCoords = closest_point(coords, json_data['elements'][chosenIndex]['geometry'])
-                distanceMoved = geopy.distance.distance(coords, newStopCoords).m
-                print(
-                    'Stop has been moved ' + str(distanceMoved) + 'm, search distance = ' + str(searchDistance) + 'm.')
+                if priorityMeasure == 0:
+                    # no suitable road found
+                    print('No suitable location for ' + str(coords[0]) + ', ' + str(coords[1]) + ' within ' + str(
+                        searchDistance) + 'm.')
+                else:
+                    newStopCoords = closest_point(coords, json_data['elements'][chosenIndex]['geometry'])
+                    distanceMoved = geopy.distance.distance(coords, newStopCoords).m
+                    print(
+                        'Stop has been moved ' + str(distanceMoved) + 'm, search distance = ' + str(searchDistance) + 'm.')
         except ValueError:
             # Currently operating under the assumption that the API needs a second to breathe
             # So I'm just going to try request it again and see what happens
