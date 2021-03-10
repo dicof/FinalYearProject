@@ -92,11 +92,6 @@ def check_for_sidewalks(coords):
             print('no elements')
 
 
-# this function gets the input from user.  INPUT = {laitutde, longitude, search_radius, option to specify the data
-# domain like hospital,education etc.} returns the list of user inputs
-userInput = [44.7007801, -63.6981095]
-
-
 # this function arranges user inputs to build the 'query' (in overpass QL language) for roads data and returns the query
 def get_roads_query(user_input):
     prefix = """[out:json][timeout:50];(way["highway"](around:"""  # this is string of syntex in 'Overpass QL' language
@@ -108,8 +103,8 @@ def get_roads_query(user_input):
 
 
 def get_roads_coords_query(user_input, distanceAround):
-    '''Takes in user input of coordinates and returns the coordinates of roads
-    that are secondary or tertiary'''
+    """Takes in user input of coordinates and returns the coordinates of roads
+    that are secondary or tertiary"""
     '''includes distance parameter for around feature'''
     prefix = """[out:json][timeout:25];(way["highway"="secondary"](around:"""
     infix1 = """ way["highway"="tertiary"](around:"""
@@ -123,7 +118,7 @@ def get_roads_coords_query(user_input, distanceAround):
 
 
 def test_query(coords, searchDistance):
-    '''Test query'''
+    """Test query"""
     query = get_roads_coords_query(coords, searchDistance)
     overpass_url = "http://overpass-api.de/api/interpreter"
     response = requests.get(overpass_url, params={'data': query})
@@ -132,8 +127,8 @@ def test_query(coords, searchDistance):
 
 
 def closest_point(coords, way):
-    '''Takes the coordinates of the existing bus stop and finds the closest node
-    on the suitable road'''
+    """Takes the coordinates of the existing bus stop and finds the closest node
+    on the suitable road"""
     a = pd.DataFrame.to_numpy(pd.DataFrame(way))
     tree = KDTree(a)
     closest_index = tree.query(coords)
@@ -197,13 +192,16 @@ def return_suitable_location(coords):
     return newStopCoords
 
 
+
+
 '''Test New Feature: Search within 150 metres, find if any road types, then prioritise
 Primary, then secondary, then tertiary, and then finally 2 lane residential
 '''
-def return_suitable_location2(coords):
 
+
+def return_suitable_location2(coords):
     start = time.time()
-    #search distance starting at 150
+    # search distance starting at 150
     searchDistance = 250
     newStopCoords = []
     distanceMoved = 0
@@ -215,7 +213,7 @@ def return_suitable_location2(coords):
         try:
             query = get_roads_coords_query(coords, searchDistance)
             response = requests.get(overpass_url, params={'data': query})
-            #print(response.json())
+            # print(response.json())
             json_data = response.json()
             if not json_data['elements']:
                 # no response, no suitable road, move out and try again
@@ -225,8 +223,8 @@ def return_suitable_location2(coords):
 
             else:
                 # A response: Check for secondary, then tertiary, then two lane residential
-                #\\TODO: Check for pavement
-                numberRoads = len(json_data['elements']) #This minus one for last index
+                # \\TODO: Check for pavement
+                numberRoads = len(json_data['elements'])  # This minus one for last index
                 priorityMeasure = 0
                 chosenIndex = -1
                 turningCircleFlag = False
@@ -238,10 +236,10 @@ def return_suitable_location2(coords):
                     print(currentRoad)
                     currentRoadPriority = 0
                     if (typeRoad == "residential"):
-                        #check if access is private, and if 2 lane, and \\TODO: paved surface and TURNING CIRCLE
+                        # check if access is private, and if 2 lane, and \\TODO: paved surface and TURNING CIRCLE
                         if 'access' in currentRoad:
                             if currentRoad['access'] == 'private':
-                                #Not suitable as a road.
+                                # Not suitable as a road.
                                 print("private road")
                         else:
                             if 'lanes' in currentRoad:
@@ -256,7 +254,7 @@ def return_suitable_location2(coords):
                                     print("one lane")
                             elif 'oneway' in currentRoad:
                                 # one way, might be an issue
-                                print("One way, ignore for now") #\\TODO: make more sense of this
+                                print("One way, ignore for now")  # \\TODO: make more sense of this
                             else:
                                 # no lanes tag on residential road, rare, take as suitable road
                                 print("No lanes tag, residential road")
@@ -280,13 +278,13 @@ def return_suitable_location2(coords):
                         else:
                             if 'lanes' in currentRoad:
                                 if int(currentRoad['lanes']) > 1:
-                                    #suitable road
-                                    #print("suitable tertiary road")
+                                    # suitable road
+                                    # print("suitable tertiary road")
                                     currentRoadPriority = 2
                                     if currentRoadPriority > priorityMeasure:
                                         priorityMeasure = currentRoadPriority
                                         chosenIndex = i
-                                        #print("Chosen Index: " + str(chosenIndex))
+                                        # print("Chosen Index: " + str(chosenIndex))
                             else:
                                 # no lanes on road, but as tertiary, should be fine
                                 currentRoadPriority = 2
@@ -297,12 +295,12 @@ def return_suitable_location2(coords):
                     elif (typeRoad == "secondary"):
                         if 'access' in currentRoad:
                             if currentRoad['access'] == 'private':
-                                #Not suitable as a road.
+                                # Not suitable as a road.
                                 print("private road")
                         else:
                             if 'lanes' in currentRoad:
                                 if int(currentRoad['lanes']) > 1:
-                                    #suitable road
+                                    # suitable road
                                     currentRoadPriority = 3
                                     if currentRoadPriority > priorityMeasure:
                                         priorityMeasure = currentRoadPriority
@@ -326,7 +324,8 @@ def return_suitable_location2(coords):
                 if priorityMeasure == 1 & turningCircleFlag == True:
                     # turning circle present and residential road chosen: choose point furthest from circle
                     print("Went in here")
-                    newStopCoords = furthest_point_from_turning_circle(turningCircleCoords, json_data['elements'][chosenIndex]['geometry'])
+                    newStopCoords = furthest_point_from_turning_circle(turningCircleCoords,
+                                                                       json_data['elements'][chosenIndex]['geometry'])
                 if priorityMeasure == 0:
                     # no suitable road found
                     print('No suitable location for ' + str(coords[0]) + ', ' + str(coords[1]) + ' within ' + str(
@@ -335,15 +334,12 @@ def return_suitable_location2(coords):
                     newStopCoords = closest_point(coords, json_data['elements'][chosenIndex]['geometry'])
                     distanceMoved = geopy.distance.distance(coords, newStopCoords).m
                     print(
-                        'Stop has been moved ' + str(distanceMoved) + 'm, search distance = ' + str(searchDistance) + 'm.')
+                        'Stop has been moved ' + str(distanceMoved) + 'm, search distance = ' + str(
+                            searchDistance) + 'm.')
         except ValueError:
             # Currently operating under the assumption that the API needs a second to breathe
             # So I'm just going to try request it again and see what happens
             print('Json Decode Error')
-
-
-
-
 
     end = time.time()
 
@@ -354,13 +350,13 @@ def return_suitable_location2(coords):
 
 
 def furthest_point_from_turning_circle(turningCircle, way):
-    '''
+    """
     This function will take a road and the co-ordinates of a turning circle
     It will return the co-ordinates of a point on that road that is as far away from the turning circle as possible
     which can be assumed to be the point where the cul-de-sac links with the more major road
-    '''
+    """
 
-    #\\TODO: This function works perfectly, just have to figure out a method to ensure it measures off a suitable road
+    # \\TODO: This function works perfectly, just have to figure out a method to ensure it measures off a suitable road
     maxDist = 0
     maxDistIndex = -1
     for i in range(0, len(way)):
@@ -369,7 +365,5 @@ def furthest_point_from_turning_circle(turningCircle, way):
         if currentDist > maxDist:
             maxDist = currentDist
             maxDistIndex = i
-
-
 
     return [way[maxDistIndex]['lat'], way[maxDistIndex]['lon']]

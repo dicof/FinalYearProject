@@ -14,16 +14,18 @@ from sklearn.cluster import KMeans
 from kneed import KneeLocator
 import geopy.distance
 import numpy as np
+import busStopCheck as bsc
+import time
 
 
 def kmeans_constrained_cluster(students):
+    """ Takes in students, returns busStops and students with y_kmeans appended """
     # This method takes in the students addresses, and returns distance constrained clusters
     # That follow the distances provided by the school board for different grades' permissible
     # walking distances
     # In this particular example, grade 8 and above are allowed walk max 400 metres
-    global centers
     MAXDIST = 400
-    coords = students[:, [2, 3]]
+    coords = students[:, [1, 2]]
     noStudents = len(students)
 
     kmeans_kwargs = {
@@ -32,9 +34,6 @@ def kmeans_constrained_cluster(students):
         "max_iter": 300,
         "random_state": 17,  # Set to produce replicable pseudorandom data
     }
-
-    # This section of code graphs the SSEs
-    '''
     # storing the sses
     sse = []
     for k in range(1, 30):
@@ -52,7 +51,7 @@ def kmeans_constrained_cluster(students):
     plt.ylabel("SSE")
     plt.show()
     """
-    '''
+
 
     kl = KneeLocator(range(1, 30), sse, curve="convex", direction="decreasing")
     noClusters = kl.elbow
@@ -94,10 +93,47 @@ def kmeans_constrained_cluster(students):
     unique, counts = np.unique(y_kmeans, return_counts=True)
     busStops = np.insert(centers, 2, counts, axis=1)
 
-    # Things that need to be returned: array of busStops, y_kmeans
-    # append y_kmeans to students
+    # Things that need to be returned: array of busStops, students
+    # with y_kmeans appended
     students = np.insert(students, 3, y_kmeans, axis=1)
-    return busStops
+    return busStops, students
 
 def main():
+    path = "C:\\Users\\diarm\\Documents\\MSISS 4TH YEAR\\FYP\\Notes and Misc\\6670Students.csv"
+    # These addresses are stored in 'dataset'
+    dataset = np.genfromtxt(path, delimiter=',', skip_header=1)
+    students = dataset[:, [1, 2, 3]]
+    busStops, students = kmeans_constrained_cluster(students)
 
+
+
+def snap_stops_to_roads(busStops):
+    # Takes in bus stops that have been formed by latitude/longitude clustering
+    # and returns stops that have been snapped to suitable roads using busStopCheck.return_suitable_location2
+    # WARNING: method takes about 10 minutes for 227 stops
+
+    start = time.time()
+    fixedCoords = []
+    for i in range(0, len(busStops)):
+        testCoords = busStops[i, 0:2]
+        fix = bsc.return_suitable_location2(testCoords)
+        if fix == [0]:
+            # No location found; send a 0 for distance moved
+            testCoordsList = [testCoords[0], testCoords[1]]
+            # Stop not moved, -1
+            testCoordsList.append(-1)
+            fixedCoords.append(testCoordsList)
+        else:
+            fixedCoords.append(fix)
+
+        print(i)
+    end = time.time()
+    print(end - start + " seconds to complete stop relocation.")
+
+
+def stop_amalgamation(busStops):
+    # This method will amalgamate any stops that are close enough that the change in walking distance
+    # is minimal.
+    # The distance matrix between stops will be used to detect cul-de-sacs as best as possible
+
+    print("Unfinished")
