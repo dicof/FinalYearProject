@@ -220,6 +220,7 @@ def return_suitable_location2(coords):
                 satisfied = True
                 print('No suitable location for ' + str(coords[0]) + ', ' + str(coords[1]) + ' within ' + str(
                     searchDistance) + 'm.')
+                typeRoad = "none"
 
             else:
                 # A response: Check for secondary, then tertiary, then two lane residential
@@ -346,6 +347,7 @@ def return_suitable_location2(coords):
     print(end - start)
     print(newStopCoords)
     newStopCoords.append(distanceMoved)
+    newStopCoords.append(typeRoad)
     return newStopCoords
 
 

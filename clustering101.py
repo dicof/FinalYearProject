@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jan  9 11:38:49 2021
+Created on Wed Mar 10 12:40:56 2021
 
 @author: Diarmuid
 """
@@ -16,6 +16,7 @@ import geopy.distance
 import numpy as np
 import busStopCheck as bsc
 import time
+import routing101 as routing
 
 
 def kmeans_constrained_cluster(students):
@@ -104,6 +105,7 @@ def main():
     dataset = np.genfromtxt(path, delimiter=',', skip_header=1)
     students = dataset[:, [1, 2, 3]]
     busStops, students = kmeans_constrained_cluster(students)
+    print(busStops)
 
 
 
@@ -117,7 +119,7 @@ def snap_stops_to_roads(busStops):
     for i in range(0, len(busStops)):
         testCoords = busStops[i, 0:2]
         fix = bsc.return_suitable_location2(testCoords)
-        if fix == [0]:
+        if fix == [0, 'none']:
             # No location found; send a 0 for distance moved
             testCoordsList = [testCoords[0], testCoords[1]]
             # Stop not moved, -1
@@ -129,11 +131,17 @@ def snap_stops_to_roads(busStops):
         print(i)
     end = time.time()
     print(end - start + " seconds to complete stop relocation.")
+    # busStops now has lat, lon, distance moved, type road moved to
+    return fixedCoords
 
 
-def stop_amalgamation(busStops):
+def stop_amalgamation(busStops, distance_matrix):
     # This method will amalgamate any stops that are close enough that the change in walking distance
     # is minimal.
     # The distance matrix between stops will be used to detect cul-de-sacs as best as possible
+
+    # Ignore first entry in distance matrix, as this is bus stop
+
+
 
     print("Unfinished")

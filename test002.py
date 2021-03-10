@@ -3,6 +3,7 @@
 import numpy as np
 import geopy.distance
 import matplotlib.pyplot as plt
+import pandas as pd
 
 LIMIT = 1000
 
@@ -71,6 +72,8 @@ for i in range(0, len(newDistances)):
     newStop = newStops[i]
     numberStudentsAtStops[newStop] += 1
 
+movedStops = np.insert(movedStops, 3, numberStudentsAtStops, axis=1)
+# movedStops: columns are lat, lon, distance moved, number students at stop
 
-
-
+movedStopsDF = pd.DataFrame(movedStops)
+movedStopsDF.to_csv("movedStops5.csv")
