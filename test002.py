@@ -24,6 +24,9 @@ path2 = "C:\\Users\\diarm\\PycharmProjects\\FinalYearProject\\movedStops4.csv"
 dataset2 = np.genfromtxt(path2, delimiter=',', skip_header=1)
 movedStops = dataset2[:, [1, 2, 3]]
 
+# drop stops with -1 as moved Distance
+movedStops = movedStops[movedStops[:, 2] != -1]
+
 # Assign every student to closest stop
 # students and movedStops
 
@@ -58,8 +61,16 @@ averageWalkingDistance = total / len(newDistances)
 plt.hist(newDistances, bins=100)
 plt.show()
 
-# count number of students walking above 400 metres
+# count number of students walking above 400 metres and number of students at each stop
 count = 0
+numberStudentsAtStops = [0] * len(movedStops)
 for i in range(0, len(newDistances)):
     if newDistances[i] > 400:
         count += 1
+
+    newStop = newStops[i]
+    numberStudentsAtStops[newStop] += 1
+
+
+
+

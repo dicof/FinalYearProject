@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 
 
 
-busStops = test001.busStops
+busStops = test002.movedStops #TODO: need to get people at each stop
 
 #depot = (44.65163190605642, -63.61516155604698) #6670 Bayer's Road, pretty far away
 depot = (44.7207799,	-63.6994861) #Charles P Allen High School, from Garry's files

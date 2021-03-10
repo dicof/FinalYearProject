@@ -99,7 +99,6 @@ while solutionFound == False:
         clusterMean = centers[y_kmeans[i]]
         #Calculate distance between student and centre
         dst = geopy.distance.distance(coords[i], clusterMean).m
-        dstAllowed = STARTDIST10 + ((dataset[i,4] - 10) * WALKINGINCREMENT)
         #Using 400metres in this particular one
         if dst > MAXDIST:
             #Not permissable, add another cluster
