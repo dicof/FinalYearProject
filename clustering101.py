@@ -16,6 +16,7 @@ import geopy.distance
 import numpy as np
 import busStopCheck as bsc
 import time
+import matplotlib.pyplot as plt
 import routing101 as routing
 
 
@@ -166,11 +167,11 @@ def stop_amalgamation(busStops, distance_matrix):
                     # either i is smaller or they're equal, keep i
                     keptStops[j] = -1
                     print("Stop " + str(i) + " has been kept")
-
+    busStops = np.insert(busStops, 2, range(0, len(busStops)), axis=1) # This is the ID of the bus stop
     busStops = np.insert(busStops, 3, keptStops, axis=1)
     busStops = busStops[busStops[:, 3] != -1]
 
-    return busStops
+    return busStops[:, [0, 1, 2]]
 
 
 
@@ -178,6 +179,7 @@ def student_reassignment(busStops, students):
     """
     This method will take in stops and students, and reassign students to their closest bus stop
     It should be used several times, as the solution will be honed in on.
+    Number of students at each stop will be stored, as will the students' stops
     """
     newStops = []
     newDistances = []
@@ -200,7 +202,16 @@ def student_reassignment(busStops, students):
         newStops.append(closestStopIndex)
         newDistances.append(closestDistance)
     students = np.insert(students, 3, newStops, axis=1)
+    # Certain stops will have no students assigned
+    unique, counts = np.unique(students[:, 3], return_counts=True)
+    studentsAtStop = [0] * len(busStops)
 
+    for i in range(0, len(unique)):
+        studentsAtStop[int(unique[i])] = int(counts[i])
+
+    # Append studentsAtStop to busStops and drop any stops that have 0 students
+    busStops = np.insert(busStops, 3, studentsAtStop, axis=1)
+    busStops = busStops[busStops[:, 3] != 0]
     # This analytics bit might go somewhere else
     maxWalkingDistance = max(newDistances)
     total = 0
@@ -214,7 +225,13 @@ def student_reassignment(busStops, students):
     print("Max student walking distance = " + str(maxWalkingDistance))
     print("Average walking distance = " + str(averageWalkingDistance))
     print("Number of students walking over 400m = " + str(count))
-    return students
+
+
+    """
+    plt.hist(newDistances, bins=200)
+    plt.show()
+    """
+    return busStops, students
 
 
 
