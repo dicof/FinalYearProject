@@ -42,6 +42,31 @@ def graphhopper_matrix(busStops, depot):
 
     return json_data
 
+def graphhopper_matrix(busStops):
+    """ takes in just the bus stops and returns a distance matrix"""
+    coords = busStops[:, [0, 1]]
+    Long = pd.core.series.Series(coords[:, 1])
+    Lat = pd.core.series.Series(coords[:, 0])
+    locationArray = list(zip(Long, Lat))
+
+    URL = "https://graphhopper.com/api/1/matrix?key=4e2c94b1-14ff-4eb5-8122-cacf2e34043d&ch.disable=true"
+
+    payload = {"points": locationArray,
+               "vehicle": "foot",
+               "out_arrays": ["times", "distances"]}
+
+    start = time.time()
+
+    r = requests.post(URL, json=payload)
+
+    end = time.time()
+
+    print(end - start)
+
+    json_data = json.loads(r.text)
+
+    return json_data
+
 
 def ortools_routing(busStops, graphhopperJson):
     """ Takes in bus stops and distance matrix and performs OR-Tools routing"""
