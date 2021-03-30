@@ -22,6 +22,7 @@ import routing101 as routing
 
 def kmeans_constrained_cluster(students):
     """ Takes in students, returns busStops and students with y_kmeans appended """
+    # \\TODO: Add a unique stop id column
     # This method takes in the students addresses, and returns distance constrained clusters
     # That follow the distances provided by the school board for different grades' permissible
     # walking distances
@@ -53,7 +54,6 @@ def kmeans_constrained_cluster(students):
     plt.ylabel("SSE")
     plt.show()
     """
-
 
     kl = KneeLocator(range(1, 30), sse, curve="convex", direction="decreasing")
     noClusters = kl.elbow
@@ -94,11 +94,17 @@ def kmeans_constrained_cluster(students):
     # Change centers into bus stops and add the number of students at each
     unique, counts = np.unique(y_kmeans, return_counts=True)
     busStops = np.insert(centers, 2, counts, axis=1)
-
+    # Adding unique stop id so stops can be referred to without their row index, which allows safer dropping of
+    # stops
+    # \\TODO: Run this by Simon. For now, stops start at 101
+    stopIDs = range(101, (len(busStops) + 101))
+    busStops = np.insert(busStops, 0, stopIDs, axis=1)
     # Things that need to be returned: array of busStops, students
     # with y_kmeans appended
-    students = np.insert(students, 3, y_kmeans, axis=1)
+    # Now stop IDs have been added, students should use that
+    students = np.insert(students, 3, (y_kmeans + 101), axis=1)
     return busStops, students
+
 
 def main():
     path = "C:\\Users\\diarm\\Documents\\MSISS 4TH YEAR\\FYP\\Notes and Misc\\6670Students.csv"
@@ -109,7 +115,6 @@ def main():
     print(busStops)
 
 
-
 def snap_stops_to_roads(busStops):
     # Takes in bus stops that have been formed by latitude/longitude clustering
     # and returns stops that have been snapped to suitable roads using busStopCheck.return_suitable_location2
@@ -118,22 +123,19 @@ def snap_stops_to_roads(busStops):
     start = time.time()
     fixedCoords = []
     for i in range(0, len(busStops)):
-        testCoords = busStops[i, 0:2]
+        testCoords = busStops[i, [1, 2]]
         fix = bsc.return_suitable_location2(testCoords)
-        if fix == [0, 'none']:
-            # No location found; send a 0 for distance moved
-            testCoordsList = [testCoords[0], testCoords[1]]
-            # Stop not moved, -1
-            testCoordsList.append(-1)
-            fixedCoords.append(testCoordsList)
-        else:
-            fixedCoords.append(fix)
+        fixedCoords.append(fix)
 
         print(i)
     end = time.time()
-    print(end - start + " seconds to complete stop relocation.")
+    print(str(end - start) + " seconds to complete stop relocation.")
+    newStops = np.array(fixedCoords)
+    newStops = np.insert(newStops, 0, busStops[:, 0], axis=1)
     # busStops now has lat, lon, distance moved, type road moved to
-    return fixedCoords
+    # Drop any stops with none as road #\\TODO: Check this
+    newStops = newStops[newStops[:, 4] != 'none']
+    return newStops
 
 
 def stop_amalgamation(busStops, distance_matrix):
@@ -145,7 +147,7 @@ def stop_amalgamation(busStops, distance_matrix):
     :return:
     """
     bigtestnp = np.array(distance_matrix['distances'])
-    suitableStops = []
+    #suitableStops = []
     keptStops = [0] * len(busStops)  # a -1 in this means the stop has been dropped
     movableDistance = 100
     for i in range(0, len(bigtestnp)):
@@ -154,7 +156,7 @@ def stop_amalgamation(busStops, distance_matrix):
             # column
             if bigtestnp[i, j] < movableDistance:
                 # append the result
-                suitableStops.append((i, j))
+                #suitableStops.append((i, j))
                 print("Stop " + str(i) + " and " + str(j) + " are " + str(bigtestnp[i, j]) + "m apart")
                 # average the distances between each stop and every other stop in the distance matrix
                 avgLengthi = np.average(bigtestnp[i])
@@ -167,12 +169,11 @@ def stop_amalgamation(busStops, distance_matrix):
                     # either i is smaller or they're equal, keep i
                     keptStops[j] = -1
                     print("Stop " + str(i) + " has been kept")
-    busStops = np.insert(busStops, 2, range(0, len(busStops)), axis=1) # This is the ID of the bus stop
-    busStops = np.insert(busStops, 3, keptStops, axis=1)
-    busStops = busStops[busStops[:, 3] != -1]
-
-    return busStops[:, [0, 1, 2]]
-
+    # busStops = np.insert(busStops, 2, range(0, len(busStops)), axis=1) # This is the ID of the bus stop
+    busStops = np.insert(busStops, 6, keptStops, axis=1)
+    busStops = busStops[busStops[:, 6] != '-1']
+    busStops = busStops[:, 0:6]
+    return busStops
 
 
 def student_reassignment(busStops, students):
@@ -183,63 +184,66 @@ def student_reassignment(busStops, students):
     """
     newStops = []
     newDistances = []
+    # If students have been through this process already, then there is no need to insert sometimes, and instead,
+    # certain columns should be replaced
+    noCols = np.shape(students)[1]
+    #\\TODO: Make sure this still works
+    newColumnsNeeded = False
+    studentsAtStop = [0] * len(busStops)
+    if noCols <= 4:
+        # Need to add the new columns
+        newColumnsNeeded = True
+        print("Columns being added")
+        busStops = np.insert(busStops, 5, studentsAtStop, axis=1)
+    else:
+        print("No columns being added, columns being replaced")
+        busStops[:, 5] = studentsAtStop
+
+
     # newStops[i] and newDistances[i] represent the new information for students[i]
     for i in range(0, len(students)):
-        studentAddress = students[i, 1:3]  # Maybe?
-        closestStopIndex = -1
+        studentAddress = students[i, [1, 2]]  # Maybe?
+        closestStopID = -1
         closestDistance = -1
         for j in range(0, len(busStops)):
-            currentStop = busStops[j, [0, 1]]
-            if busStops[j, 2] != -1:
+            currentStop = busStops[j, [1, 2]]
+            if busStops[j, 4] != 'none':
                 currentDist = geopy.distance.distance(studentAddress, currentStop).m
                 if closestDistance == -1:
                     closestDistance = currentDist
-                    closestStopIndex = j
+                    closestStopID = busStops[j, 0]
                 elif currentDist < closestDistance:
                     closestDistance = currentDist
-                    closestStopIndex = j
-
-        newStops.append(closestStopIndex)
+                    closestStopID = busStops[j, 0]
+        newStops.append(closestStopID)
         newDistances.append(closestDistance)
-    students = np.insert(students, 3, newStops, axis=1)
+        busStopIndex = np.argwhere(busStops[:, 0] == closestStopID)
+        busStops[busStopIndex, 5] = int(busStops[busStopIndex, 5]) + 1
+
+    if newColumnsNeeded:
+        students[:, 3] = newStops
+        students = np.insert(students, 4, newDistances, axis=1)
+    else:
+        students[:, 3] = newStops
+        students[:, 4] = newDistances
     # Certain stops will have no students assigned
-    unique, counts = np.unique(students[:, 3], return_counts=True)
-    studentsAtStop = [0] * len(busStops)
 
-    for i in range(0, len(unique)):
-        studentsAtStop[int(unique[i])] = int(counts[i])
-
-    # Append studentsAtStop to busStops and drop any stops that have 0 students
-    busStops = np.insert(busStops, 3, studentsAtStop, axis=1)
-    busStops = busStops[busStops[:, 3] != 0]
+    busStops = busStops[busStops[:, 5] != '0']
     # This analytics bit might go somewhere else
     maxWalkingDistance = max(newDistances)
-    total = 0
-    count = 0
-    for i in range(0, len(newDistances)):
-        total = total + newDistances[i]
-        if newDistances[i] > 400:
-            count += 1
-    averageWalkingDistance = total / len(newDistances)
+    averageWalkingDistance = np.average(newDistances)
+
+    def condition(x):
+        return x > 400
+
+    count = sum(condition(x) for x in newDistances)
     print("Number of bus Stops = " + str(len(busStops)))
     print("Max student walking distance = " + str(maxWalkingDistance))
     print("Average walking distance = " + str(averageWalkingDistance))
     print("Number of students walking over 400m = " + str(count))
-
 
     """
     plt.hist(newDistances, bins=200)
     plt.show()
     """
     return busStops, students
-
-
-
-def distance_matrix_stop_amalgamation(busStops, students, distance_matrix):
-    # This method will amalgamate any stops that are close enough that the change in walking distance
-    # is minimal.
-    # The distance matrix between stops will be used to detect cul-de-sacs as best as possible
-
-    # Ignore first entry in distance matrix, as this is bus stop
-    print("Unfinished")
-

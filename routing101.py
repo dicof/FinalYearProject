@@ -17,9 +17,9 @@ joining together the distanceMatrix and or-tools sections
 """
 
 
-def graphhopper_matrix(busStops, depot):
+def graphhopper_matrix_depot(busStops, depot):
     """ Takes in bus stops and depot (school), and returns distance matrix """
-    coords = np.insert(busStops[:, [0, 1]], 0, depot, axis=0)
+    coords = np.insert(busStops[:, [1, 2]].astype(float), 0, depot, axis=0)
     Long = pd.core.series.Series(coords[:, 1])
     Lat = pd.core.series.Series(coords[:, 0])
     locationArray = list(zip(Long, Lat))
@@ -44,7 +44,7 @@ def graphhopper_matrix(busStops, depot):
 
 def graphhopper_matrix(busStops):
     """ takes in just the bus stops and returns a distance matrix"""
-    coords = busStops[:, [0, 1]]
+    coords = busStops[:, [1, 2]]
     Long = pd.core.series.Series(coords[:, 1])
     Lat = pd.core.series.Series(coords[:, 0])
     locationArray = list(zip(Long, Lat))
@@ -71,7 +71,7 @@ def graphhopper_matrix(busStops):
 def ortools_routing(busStops, graphhopperJson):
     """ Takes in bus stops and distance matrix and performs OR-Tools routing"""
     # instatiate the data model
-    data = create_data_model(graphhopperJson, busStops)
+    data = create_data_model(graphhopperJson['distances'], busStops)
     # Create the routing index manager.
     manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']),
                                            data['num_vehicles'], data['depot'])
@@ -137,13 +137,14 @@ def create_data_model(distanceMatrix, busStops):
     data['depot'] = 0 # Index of the depot in the distance matrix
 
     # students at each stop: also demand at each stop
-    data['students'] = np.insert(busStops[:, 3], 0, 0, axis=0)
+    data['students'] = np.insert(busStops[:, 5].astype(int), 0, 0, axis=0)
     data['vehicle_capacities'] = [VEHICLECAPACITY] * NUMBERVEHICLES
 
     return data
 
 def print_solution(data, manager, routing, solution):
     """Prints solution on console."""
+    #\\TODO: Change row ID to stop ID
     total_distance = 0
     total_load = 0
     for vehicle_id in range(data['num_vehicles']):

@@ -192,8 +192,6 @@ def return_suitable_location(coords):
     return newStopCoords
 
 
-
-
 '''Test New Feature: Search within 150 metres, find if any road types, then prioritise
 Primary, then secondary, then tertiary, and then finally 2 lane residential
 '''
@@ -220,7 +218,8 @@ def return_suitable_location2(coords):
                 satisfied = True
                 print('No suitable location for ' + str(coords[0]) + ', ' + str(coords[1]) + ' within ' + str(
                     searchDistance) + 'm.')
-                typeRoad = "none"
+                newStopCoords = [coords[0], coords[1]]
+                chosenRoad = "none"
 
             else:
                 # A response: Check for secondary, then tertiary, then two lane residential
@@ -228,6 +227,7 @@ def return_suitable_location2(coords):
                 numberRoads = len(json_data['elements'])  # This minus one for last index
                 priorityMeasure = 0
                 chosenIndex = -1
+                chosenRoad = ""
                 turningCircleFlag = False
                 turningCircleCoords = []
                 for i in range(0, numberRoads):
@@ -250,6 +250,7 @@ def return_suitable_location2(coords):
                                     if currentRoadPriority > priorityMeasure:
                                         priorityMeasure = currentRoadPriority
                                         chosenIndex = i
+                                        chosenRoad = typeRoad
                                 else:
                                     # unsuitable road, one lane
                                     print("one lane")
@@ -263,6 +264,7 @@ def return_suitable_location2(coords):
                                 if currentRoadPriority > priorityMeasure:
                                     priorityMeasure = currentRoadPriority
                                     chosenIndex = i
+                                    chosenRoad = typeRoad
                     elif typeRoad == "turning_circle":
                         # A turning circle has been detected. This might only become relevant
                         # If a residential road is chosen.
@@ -285,6 +287,7 @@ def return_suitable_location2(coords):
                                     if currentRoadPriority > priorityMeasure:
                                         priorityMeasure = currentRoadPriority
                                         chosenIndex = i
+                                        chosenRoad = typeRoad
                                         # print("Chosen Index: " + str(chosenIndex))
                             else:
                                 # no lanes on road, but as tertiary, should be fine
@@ -292,6 +295,7 @@ def return_suitable_location2(coords):
                                 if currentRoadPriority > priorityMeasure:
                                     priorityMeasure = currentRoadPriority
                                     chosenIndex = i
+                                    chosenRoad = typeRoad
                                     # print("Chosen Index: " + str(chosenIndex))
                     elif (typeRoad == "secondary"):
                         if 'access' in currentRoad:
@@ -306,18 +310,21 @@ def return_suitable_location2(coords):
                                     if currentRoadPriority > priorityMeasure:
                                         priorityMeasure = currentRoadPriority
                                         chosenIndex = i
+                                        chosenRoad = typeRoad
                             else:
                                 # no lanes tag, but as secondary, should be fine
                                 currentRoadPriority = 3
                                 if currentRoadPriority > priorityMeasure:
                                     priorityMeasure = currentRoadPriority
                                     chosenIndex = i
+                                    chosenRoad = typeRoad
                     elif typeRoad == "primary":
                         currentRoadPriority = 4
                         print("Primary road chosen")
                         if currentRoadPriority > priorityMeasure:
                             priorityMeasure = currentRoadPriority
                             chosenIndex = i
+                            chosenRoad = typeRoad
                 satisfied = True
                 # In case of residential road, turning circle must be dealt with
                 # aim is to choose point on road that is furthest from the turning circle
@@ -331,6 +338,8 @@ def return_suitable_location2(coords):
                     # no suitable road found
                     print('No suitable location for ' + str(coords[0]) + ', ' + str(coords[1]) + ' within ' + str(
                         searchDistance) + 'm.')
+                    newStopCoords = [coords[0], coords[1]]
+                    chosenRoad = 'none'
                 else:
                     newStopCoords = closest_point(coords, json_data['elements'][chosenIndex]['geometry'])
                     distanceMoved = geopy.distance.distance(coords, newStopCoords).m
@@ -347,7 +356,7 @@ def return_suitable_location2(coords):
     print(end - start)
     print(newStopCoords)
     newStopCoords.append(distanceMoved)
-    newStopCoords.append(typeRoad)
+    newStopCoords.append(chosenRoad)
     return newStopCoords
 
 
