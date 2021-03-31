@@ -23,11 +23,12 @@ def graphhopper_matrix_depot(busStops, depot):
     Long = pd.core.series.Series(coords[:, 1])
     Lat = pd.core.series.Series(coords[:, 0])
     locationArray = list(zip(Long, Lat))
-
+    curbsides = ["right"]*len(locationArray)
     URL = "https://graphhopper.com/api/1/matrix?key=4e2c94b1-14ff-4eb5-8122-cacf2e34043d&ch.disable=true"
 
     payload = {"points": locationArray,
-               "vehicle": "foot",
+               "vehicle": "car",
+               #"curbsides": curbsides,
                "out_arrays": ["times", "distances"]}
 
     start = time.time()
@@ -52,7 +53,8 @@ def graphhopper_matrix(busStops):
     URL = "https://graphhopper.com/api/1/matrix?key=4e2c94b1-14ff-4eb5-8122-cacf2e34043d&ch.disable=true"
 
     payload = {"points": locationArray,
-               "vehicle": "foot",
+               "vehicle": "car",
+               #"curbsides": "right",
                "out_arrays": ["times", "distances"]}
 
     start = time.time()
@@ -121,7 +123,8 @@ def ortools_routing(busStops, graphhopperJson):
 
     # Print solution on console.
     if solution:
-        print_solution(data, manager, routing, solution)
+        solutionSet = print_solution(data, manager, routing, solution)
+        return solutionSet
 
     else:
         print("No solution.")
@@ -144,9 +147,10 @@ def create_data_model(distanceMatrix, busStops):
 
 def print_solution(data, manager, routing, solution):
     """Prints solution on console."""
-    #\\TODO: Change row ID to stop ID
+    #\\TODO: Change row ID to stop ID [or store row ID's]
     total_distance = 0
     total_load = 0
+    solutionSet = [[] for i in range(data['num_vehicles'])]
     for vehicle_id in range(data['num_vehicles']):
         index = routing.Start(vehicle_id)
         plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
@@ -160,6 +164,7 @@ def print_solution(data, manager, routing, solution):
             index = solution.Value(routing.NextVar(index))
             route_distance += routing.GetArcCostForVehicle(
                 previous_index, index, vehicle_id)
+            solutionSet[vehicle_id].append(index)
         plan_output += ' {0} Load({1})\n'.format(manager.IndexToNode(index),
                                                  route_load)
         plan_output += 'Distance of the route: {}m\n'.format(route_distance)
@@ -169,4 +174,55 @@ def print_solution(data, manager, routing, solution):
         total_load += route_load
     print('Total distance of all routes: {}m'.format(total_distance))
     print('Total load of all routes: {}'.format(total_load))
+    print(solutionSet)
+    return solutionSet
 
+
+def turn_indexes_to_stops(solutionSet, busStops):
+    """
+    This [hopefully temporary] method aims to turn the solution sets, which refer to row indexes, into
+    routes of stop IDs.
+    """
+    stopIDSets = [[0] for i in range(len(solutionSet))]
+    for i in range(0, len(solutionSet)):
+        # i refers to the vehicle route
+        if len(solutionSet[i]) != 1:
+            # Non empty list = used bus
+            for j in range(0, len(solutionSet[i]) - 1):
+                # j is the particular stop on the route
+                currentStopIndex = solutionSet[i][j]
+                currentStopID = busStops[(currentStopIndex - 1), [1,2]].astype(float)
+                stopIDSets[i].append(currentStopID)
+            stopIDSets[i].append(0)
+
+    return stopIDSets
+
+def graphhopper_routing_test(route):
+    """
+    Testing the grahhopper routing system
+    :param route:
+    :return:
+    """
+    coords = route # This may change if input changes
+    Long = pd.core.series.Series(coords[:, 1])
+    Lat = pd.core.series.Series(coords[:, 0])
+    locationArray = list(zip(Long, Lat))
+    curbsides = ["right"]*len(coords)
+    URL = "https://graphhopper.com/api/1/route?key=4e2c94b1-14ff-4eb5-8122-cacf2e34043d&ch.disable=true"
+
+    payload = {"points": locationArray,
+               "vehicle": "car",
+               "curbsides": "right",
+               }
+
+    start = time.time()
+
+    r = requests.post(URL, json=payload)
+
+    end = time.time()
+
+    print(end - start)
+
+    json_data = json.loads(r.text)
+
+    return json_data
