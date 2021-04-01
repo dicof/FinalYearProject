@@ -51,7 +51,9 @@ def check_for_sidewalks(coords):
     response = requests.get(overpass_url, params={'data': query})
     # print(response.text)
     json_data = response.json()
-    ways = len(json_data['elements'])  # number of ways to evaluate
+    print(json_data)
+    ways = len(json_data['elements']) # number of ways to evaluate
+    print(ways)
     for i in range(ways):
         # check which kind of way
         '''
@@ -76,6 +78,8 @@ def check_for_sidewalks(coords):
                 if 'foot' in json_data['elements'][i]['tags']:
                     # footway on path. Suitable for bus Stop
                     print('sidewalk on path, type: ' + json_data['elements'][i]['tags']['foot'])
+            elif wayType == 'footway':
+                print('sidewalk on path, type: ' + json_data['elements'][i]['tags']['highway'])
             elif wayType == 'residential':
                 if 'sidewalk' in json_data['elements'][i]['tags']:
                     # Sidewalk on secondary road - perhaps check for left/right
@@ -90,6 +94,7 @@ def check_for_sidewalks(coords):
                 print('no sidewalk')
         else:
             print('no elements')
+
 
 
 # this function arranges user inputs to build the 'query' (in overpass QL language) for roads data and returns the query

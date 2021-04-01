@@ -49,12 +49,12 @@ def graphhopper_matrix(busStops):
     Long = pd.core.series.Series(coords[:, 1])
     Lat = pd.core.series.Series(coords[:, 0])
     locationArray = list(zip(Long, Lat))
-
+    curbsides = ["right"]*len(busStops)
     URL = "https://graphhopper.com/api/1/matrix?key=4e2c94b1-14ff-4eb5-8122-cacf2e34043d&ch.disable=true"
 
     payload = {"points": locationArray,
                "vehicle": "car",
-               #"curbsides": "right",
+               #"curbsides": curbsides,
                "out_arrays": ["times", "distances"]}
 
     start = time.time()
@@ -197,32 +197,3 @@ def turn_indexes_to_stops(solutionSet, busStops):
 
     return stopIDSets
 
-def graphhopper_routing_test(route):
-    """
-    Testing the grahhopper routing system
-    :param route:
-    :return:
-    """
-    coords = route # This may change if input changes
-    Long = pd.core.series.Series(coords[:, 1])
-    Lat = pd.core.series.Series(coords[:, 0])
-    locationArray = list(zip(Long, Lat))
-    curbsides = ["right"]*len(coords)
-    URL = "https://graphhopper.com/api/1/route?key=4e2c94b1-14ff-4eb5-8122-cacf2e34043d&ch.disable=true"
-
-    payload = {"points": locationArray,
-               "vehicle": "car",
-               "curbsides": "right",
-               }
-
-    start = time.time()
-
-    r = requests.post(URL, json=payload)
-
-    end = time.time()
-
-    print(end - start)
-
-    json_data = json.loads(r.text)
-
-    return json_data
