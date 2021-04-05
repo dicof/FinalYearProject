@@ -43,6 +43,55 @@ def graphhopper_matrix_depot(busStops, depot):
 
     return json_data
 
+def student_stop_walking_distances(students, busStops):
+    """The aim of this function is to get the walking distance and time for each student to their bus stop"""
+    studentCoords = students[:, [1, 2]]
+    Long = pd.core.series.Series(studentCoords[:, 1])
+    Lat = pd.core.series.Series(studentCoords[:, 0])
+    studentsArray = list(zip(Long, Lat))
+
+    # Need to get the location of the stop that that student is going to
+
+
+
+    stopCoords = busStops[:, [1, 2]]
+    Long = pd.core.series.Series(stopCoords[:, 1])
+    Lat = pd.core.series.Series(stopCoords[:, 0])
+    stopArray = list(zip(Long, Lat))
+    URL = "https://graphhopper.com/api/1/matrix?key=4e2c94b1-14ff-4eb5-8122-cacf2e34043d&ch.disable=true"
+
+    payload = {"from_points": studentsArray,
+               "to_points": stopArray,
+               "vehicle": "foot",
+               "out_arrays": ["times", "distances"]}
+
+    start = time.time()
+
+    r = requests.post(URL, json=payload)
+
+    end = time.time()
+
+    print(end - start)
+
+    json_data = json.loads(r.text)
+
+    #print(json_data)
+    return json_data
+
+def check_walking_distances(students, busStops, walking_matrix):
+    """Checks walking distances from the graphhopper matrix"""
+    walkingDistances = []
+    for i in range(len(students)):
+    # Get id for stop that student is assigned to
+        stopID = students[i, 3]
+        stopIndex = np.argwhere(busStops[:, 0] == stopID)[0][0]
+        walkingDistance = walking_matrix['distances'][i][stopIndex]
+        print("student walking distance = " + str(walkingDistance) + ". Crow = " + str(students[i, 4]))
+        walkingDistances.append(walkingDistance)
+
+    print("Average walking distance = " + str(np.average(walkingDistances)))
+    return walkingDistances
+
 def graphhopper_matrix(busStops):
     """ takes in just the bus stops and returns a distance matrix"""
     coords = busStops[:, [1, 2]]
@@ -73,13 +122,32 @@ def graphhopper_matrix(busStops):
 def ortools_routing(busStops, graphhopperJson):
     """ Takes in bus stops and distance matrix and performs OR-Tools routing"""
     # instatiate the data model
-    data = create_data_model(graphhopperJson['distances'], busStops)
+    data = create_data_model(graphhopperJson, busStops)
     # Create the routing index manager.
     manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']),
                                            data['num_vehicles'], data['depot'])
 
     # Create Routing Model.
     routing = pywrapcp.RoutingModel(manager)
+
+    #\\TODO: This is a work in progress
+    def time_callback(from_index, to_index):
+        """Returns travel time between the two nodes"""
+        from_node = manager.IndexToNode(from_index)
+        to_node = manager.IndexToNode(to_index)
+        return data['time_matrix'][from_node][to_node]
+    time_callback_index = routing.RegisterTransitCallback(time_callback)
+    time = 'Time'
+    routing.AddDimension(
+        time_callback_index,
+        0, # allow waiting time
+        1000000*60, # maximum time each vehicle is allowed travel: minutes * 60 = seconds
+        False, # force start cumul to zero
+        time
+    )
+
+
+
 
     # Create and register a transit callback.
     def distance_callback(from_index, to_index):
@@ -101,8 +169,7 @@ def ortools_routing(busStops, graphhopperJson):
         from_node = manager.IndexToNode(from_index)
         return data['students'][from_node]
 
-    demand_callback_index = routing.RegisterUnaryTransitCallback(
-        demand_callback)
+    demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
     routing.AddDimensionWithVehicleCapacity(
         demand_callback_index,
         0,  # null capacity slack
@@ -130,12 +197,13 @@ def ortools_routing(busStops, graphhopperJson):
         print("No solution.")
 
 
-def create_data_model(distanceMatrix, busStops):
+def create_data_model(graphhopperJson, busStops):
     """Stores the data for the problem."""
-    NUMBERVEHICLES = 15 # This is where you change the maximum number of vehicles
+    NUMBERVEHICLES = 20 # This is where you change the maximum number of vehicles
     VEHICLECAPACITY = 70 # This is the maximum number of students that the buses can fit.
     data = {}
-    data['distance_matrix'] = distanceMatrix
+    data['distance_matrix'] = graphhopperJson['distances']
+    data['time_matrix'] = graphhopperJson['times']
     data['num_vehicles'] = NUMBERVEHICLES
     data['depot'] = 0 # Index of the depot in the distance matrix
 

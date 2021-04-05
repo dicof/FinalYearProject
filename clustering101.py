@@ -115,6 +115,30 @@ def main():
     print(busStops)
 
 
+def snap_stops_check_sidewalks(busStops):
+    """
+    Takes in the bus Stops formed by the kmeans constrained clustering
+    and returns stops that have been snapped to suitable locations NOW CONTAINING SIDEWALKS
+    :param busStops:
+    :return:
+    """
+    start = time.time()
+    fixedCoords = []
+    for i in range(0, len(busStops)):
+        testCoords = busStops[i, [1, 2]]
+        fix = bsc.return_suitable_location2(testCoords)
+        fixedCoords.append(fix)
+
+        print(i)
+    end = time.time()
+    print(str(end - start) + " seconds to complete stop relocation.")
+    newStops = np.array(fixedCoords)
+    newStops = np.insert(newStops, 0, busStops[:, 0], axis=1)
+    # busStops now has lat, lon, distance moved, type road moved to
+    # Drop any stops with none as road #\\TODO: Check this
+    newStops = newStops[newStops[:, 4] != 'none']
+    return newStops
+
 def snap_stops_to_roads(busStops):
     # Takes in bus stops that have been formed by latitude/longitude clustering
     # and returns stops that have been snapped to suitable roads using busStopCheck.return_suitable_location2
@@ -175,6 +199,82 @@ def stop_amalgamation(busStops, distance_matrix):
     busStops = busStops[:, 0:6]
     return busStops
 
+def new_student_reassignment(busStops, students, walking_matrix):
+    """New student reassignment using the walking matrix"""
+    newStops = []
+    newDistances = []
+    # If students have been through this process already, then there is no need to insert sometimes, and instead,
+    # certain columns should be replaced
+    noCols = np.shape(students)[1]
+    noColsBusStops = np.shape(busStops)[1]
+    # \\TODO: Make sure this still works
+    newColumnsNeeded = False
+    studentsAtStop = [0] * len(busStops)
+    if noCols <= 4:
+        # Need to add the new columns TO STUDENTS, maybe not to stops
+        newColumnsNeeded = True
+        print("Columns being added to students")
+        if noColsBusStops < 6:
+            busStops = np.insert(busStops, 5, studentsAtStop, axis=1)
+        else:
+            # need to set the students at stops to zero
+            busStops[:, 5] = studentsAtStop
+    else:
+        print("No columns being added, columns being replaced")
+        busStops[:, 5] = studentsAtStop
+
+    for i in range(len(students)):
+        closestDistance = np.min(walking_matrix['distances'][i])
+        stopIndex = np.argwhere(walking_matrix['distances'][i] == closestDistance)[0][0]
+        stopID = busStops[stopIndex, 0]
+        newStops.append(stopID)
+        newDistances.append(closestDistance)
+        busStops[stopIndex, 5] = int(busStops[stopIndex, 5]) + 1
+
+    if newColumnsNeeded:
+        if noCols == 3:
+            students = np.insert(students, 3, newStops, axis=1)
+        else:
+            students[:, 3] = newStops
+        students = np.insert(students, 4, newDistances, axis=1)
+    else:
+        students[:, 3] = newStops
+        students[:, 4] = newDistances
+    # Certain stops will have no students assigned
+
+    busStops = busStops[busStops[:, 5] != 0]
+    # This analytics bit might go somewhere else
+    maxWalkingDistance = max(newDistances)
+    averageWalkingDistance = np.average(newDistances)
+
+    def condition(x):
+        return x > 400
+
+    count = sum(condition(x) for x in newDistances)
+    print("Number of bus Stops = " + str(len(busStops)))
+    print("Max student walking distance = " + str(maxWalkingDistance))
+    print("Average walking distance = " + str(averageWalkingDistance))
+    print("Number of students walking over 400m = " + str(count))
+
+    """
+    plt.hist(newDistances, bins=200)
+    plt.show()
+    """
+    busStops = average_walking_distance_to_stop(busStops, students)
+    return busStops, students
+
+
+def average_walking_distance_to_stop(busStops, students):
+    """Computes the average walking distance to each stop"""
+    averageWalkingDistance = []
+    for i in range(len(busStops)):
+        stopID = busStops[i, 0]
+        studentsAtStop = students[students[:, 3] == stopID]
+        avg = np.average(studentsAtStop[:, 4])
+        averageWalkingDistance.append(avg)
+
+    busStops = np.insert(busStops, 6, averageWalkingDistance, axis=1)
+    return busStops
 
 def student_reassignment(busStops, students):
     """
@@ -187,14 +287,19 @@ def student_reassignment(busStops, students):
     # If students have been through this process already, then there is no need to insert sometimes, and instead,
     # certain columns should be replaced
     noCols = np.shape(students)[1]
+    noColsBusStops = np.shape(busStops)[1]
     #\\TODO: Make sure this still works
     newColumnsNeeded = False
     studentsAtStop = [0] * len(busStops)
     if noCols <= 4:
-        # Need to add the new columns
+        # Need to add the new columns TO STUDENTS, maybe not to stops
         newColumnsNeeded = True
-        print("Columns being added")
-        busStops = np.insert(busStops, 5, studentsAtStop, axis=1)
+        print("Columns being added to students")
+        if noColsBusStops < 6:
+            busStops = np.insert(busStops, 5, studentsAtStop, axis=1)
+        else:
+            # need to set the students at stops to zero
+            busStops[:, 5] = studentsAtStop
     else:
         print("No columns being added, columns being replaced")
         busStops[:, 5] = studentsAtStop
@@ -221,14 +326,17 @@ def student_reassignment(busStops, students):
         busStops[busStopIndex, 5] = int(busStops[busStopIndex, 5]) + 1
 
     if newColumnsNeeded:
-        students[:, 3] = newStops
+        if noCols == 3:
+            students = np.insert(students, 3, newStops, axis=1)
+        else:
+            students[:, 3] = newStops
         students = np.insert(students, 4, newDistances, axis=1)
     else:
         students[:, 3] = newStops
         students[:, 4] = newDistances
     # Certain stops will have no students assigned
 
-    busStops = busStops[busStops[:, 5] != '0']
+    busStops = busStops[busStops[:, 5] != 0]
     # This analytics bit might go somewhere else
     maxWalkingDistance = max(newDistances)
     averageWalkingDistance = np.average(newDistances)

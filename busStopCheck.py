@@ -51,9 +51,9 @@ def check_for_sidewalks(coords):
     response = requests.get(overpass_url, params={'data': query})
     # print(response.text)
     json_data = response.json()
-    print(json_data)
+    #print(json_data)
     ways = len(json_data['elements']) # number of ways to evaluate
-    print(ways)
+    #print(ways)
     for i in range(ways):
         # check which kind of way
         '''
@@ -67,6 +67,7 @@ def check_for_sidewalks(coords):
         '''
         if 'elements' in json_data:
             wayType = json_data['elements'][i]['tags']['highway']
+            print(json_data['elements'][i]['tags'])
             if wayType == 'secondary':
                 # secondary style road - check for sidewalk (If thats a thing, might not be)
                 if 'sidewalk' in json_data['elements'][i]['tags']:
@@ -383,3 +384,211 @@ def furthest_point_from_turning_circle(turningCircle, way):
             maxDistIndex = i
 
     return [way[maxDistIndex]['lat'], way[maxDistIndex]['lon']]
+
+
+def return_location_sidewalks(coords):
+    start = time.time()
+    # search distance starting at 150
+    searchDistance = 250
+    newStopCoords = []
+    distanceMoved = 0
+    json_data = []
+    overpass_url = "http://overpass-api.de/api/interpreter"
+
+    satisfied = False
+    while satisfied == False:
+        try:
+            query = get_roads_coords_query(coords, searchDistance)
+            response = requests.get(overpass_url, params={'data': query})
+            # print(response.json())
+            json_data = response.json()
+            if not json_data['elements']:
+                # no response, no suitable road, move out and try again
+                satisfied = True
+                print('No suitable location for ' + str(coords[0]) + ', ' + str(coords[1]) + ' within ' + str(
+                    searchDistance) + 'm.')
+                newStopCoords = [coords[0], coords[1]]
+                chosenRoad = "none"
+
+            else:
+                # A response: Check for secondary, then tertiary, then two lane residential
+                # \\TODO: Check for pavement
+                numberRoads = len(json_data['elements'])  # This minus one for last index
+                priorityMeasure = 0
+                chosenIndex = -1
+                chosenRoad = ""
+                turningCircleFlag = False
+                turningCircleCoords = []
+                for i in range(0, numberRoads):
+                    currentRoad = json_data['elements'][i]['tags']
+                    print(json_data['elements'][i])
+                    typeRoad = json_data['elements'][i]['tags']['highway']
+                    print(currentRoad)
+                    currentRoadPriority = 0
+                    if (typeRoad == "residential"):
+                        # check if access is private, and if 2 lane, and \\TODO: paved surface and TURNING CIRCLE
+                        if 'access' in currentRoad:
+                            if currentRoad['access'] == 'private':
+                                # Not suitable as a road.
+                                print("private road")
+                        else:
+                            if 'lanes' in currentRoad:
+                                if int(currentRoad['lanes']) > 1:
+                                    # suitable road
+                                    currentRoadPriority = 1
+                                    if currentRoadPriority > priorityMeasure:
+                                        priorityMeasure = currentRoadPriority
+                                        chosenIndex = i
+                                        chosenRoad = typeRoad
+                                else:
+                                    # unsuitable road, one lane
+                                    print("one lane")
+                            elif 'oneway' in currentRoad:
+                                # one way, might be an issue
+                                print("One way, ignore for now")  # \\TODO: make more sense of this
+                            else:
+                                # no lanes tag on residential road, rare, take as suitable road
+                                print("No lanes tag, residential road")
+                                currentRoadPriority = 1
+                                if currentRoadPriority > priorityMeasure:
+                                    priorityMeasure = currentRoadPriority
+                                    chosenIndex = i
+                                    chosenRoad = typeRoad
+                    elif typeRoad == "turning_circle":
+                        # A turning circle has been detected. This might only become relevant
+                        # If a residential road is chosen.
+                        # Store the co-ordinates of the turning circle and flag that a turning circle is present
+                        turningCircleFlag = True
+                        print("turning circle found")
+                        turningCircleCoords = [json_data['elements'][i]['lat'], json_data['elements'][i]['lon']]
+                    elif typeRoad == "tertiary":
+                        print("tertiary road")
+                        if 'access' in currentRoad:
+                            if currentRoad['access'] == 'private':
+                                # Not suitable as a road.
+                                print("private tertiary road")
+                        else:
+                            if 'lanes' in currentRoad:
+                                if int(currentRoad['lanes']) > 1:
+                                    # suitable road
+                                    # print("suitable tertiary road")
+                                    currentRoadPriority = 2
+                                    if currentRoadPriority > priorityMeasure:
+                                        priorityMeasure = currentRoadPriority
+                                        chosenIndex = i
+                                        chosenRoad = typeRoad
+                                        # print("Chosen Index: " + str(chosenIndex))
+                            else:
+                                # no lanes on road, but as tertiary, should be fine
+                                currentRoadPriority = 2
+                                if currentRoadPriority > priorityMeasure:
+                                    priorityMeasure = currentRoadPriority
+                                    chosenIndex = i
+                                    chosenRoad = typeRoad
+                                    # print("Chosen Index: " + str(chosenIndex))
+                    elif (typeRoad == "secondary"):
+                        if 'access' in currentRoad:
+                            if currentRoad['access'] == 'private':
+                                # Not suitable as a road.
+                                print("private road")
+                        else:
+                            if 'lanes' in currentRoad:
+                                if int(currentRoad['lanes']) > 1:
+                                    # suitable road
+                                    currentRoadPriority = 3
+                                    if currentRoadPriority > priorityMeasure:
+                                        priorityMeasure = currentRoadPriority
+                                        chosenIndex = i
+                                        chosenRoad = typeRoad
+                            else:
+                                # no lanes tag, but as secondary, should be fine
+                                currentRoadPriority = 3
+                                if currentRoadPriority > priorityMeasure:
+                                    priorityMeasure = currentRoadPriority
+                                    chosenIndex = i
+                                    chosenRoad = typeRoad
+                    elif typeRoad == "primary":
+                        currentRoadPriority = 4
+                        print("Primary road chosen")
+                        if currentRoadPriority > priorityMeasure:
+                            priorityMeasure = currentRoadPriority
+                            chosenIndex = i
+                            chosenRoad = typeRoad
+                satisfied = True
+                # In case of residential road, turning circle must be dealt with
+                # aim is to choose point on road that is furthest from the turning circle
+                print(str(priorityMeasure) + " is priority Measure")
+                if priorityMeasure == 1 & turningCircleFlag == True:
+                    # turning circle present and residential road chosen: choose point furthest from circle
+                    print("Went in here")
+                    newStopCoords = furthest_point_from_turning_circle(turningCircleCoords,
+                                                                       json_data['elements'][chosenIndex]['geometry'])
+                if priorityMeasure == 0:
+                    # no suitable road found
+                    print('No suitable location for ' + str(coords[0]) + ', ' + str(coords[1]) + ' within ' + str(
+                        searchDistance) + 'm.')
+                    newStopCoords = [coords[0], coords[1]]
+                    chosenRoad = 'none'
+                else:
+                    newStopCoords = closest_point(coords, json_data['elements'][chosenIndex]['geometry'])
+                    distanceMoved = geopy.distance.distance(coords, newStopCoords).m
+                    print(
+                        'Stop has been moved ' + str(distanceMoved) + 'm, search distance = ' + str(
+                            searchDistance) + 'm.')
+        except ValueError:
+            # Currently operating under the assumption that the API needs a second to breathe
+            # So I'm just going to try request it again and see what happens
+            print('Json Decode Error')
+
+    end = time.time()
+
+    print(end - start)
+    print(newStopCoords)
+    newStopCoords.append(distanceMoved)
+    newStopCoords.append(chosenRoad)
+    return newStopCoords
+
+def sidewalk_check(way):
+    """
+    This method takes in a way from the openStreetMap API and returns true if this way features a suitable sidewalk,
+    and false if it doesn't.
+    \\TODO: Figure out what to do with footway tagged ways that have sidewalks
+    :param way:
+    :return:
+    """
+    wayType = way['highway']
+    if wayType == 'secondary':
+        # secondary style road - check for sidewalk (If thats a thing, might not be)
+        if 'sidewalk' in way:
+            # Sidewalk on secondary road - perhaps check for left/right
+            '''Check for left right here if needed'''
+            print('sidewalk on secondary, type: ' + way['sidewalk'])
+
+    elif wayType == 'path':
+        if 'foot' in way:
+            # footway on path. Suitable for bus Stop
+            print('sidewalk on path, type: ' + way['foot'])
+    elif wayType == 'footway':
+        print('sidewalk on path, type: ' + way['highway'])
+    elif wayType == 'residential':
+        if 'sidewalk' in way:
+            # Sidewalk on secondary road - perhaps check for left/right
+            '''Check for left right here if needed'''
+            print('sidewalk on residential, type: ' + way['sidewalk'])
+    elif wayType == 'tertiary':
+        if 'sidewalk' in way:
+            # Sidewalk on secondary road - perhaps check for left/right
+            '''Check for left right here if needed'''
+            print('sidewalk on tertiary, type: ' + way['sidewalk'])
+    else:
+        print('no sidewalk')
+
+
+
+def footway_distance_check(coords, way):
+    """
+
+    :param coords:
+    :param way:
+    :return:
+    """

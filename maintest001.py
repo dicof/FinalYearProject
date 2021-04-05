@@ -12,6 +12,27 @@ path = "C:\\Users\\diarm\\Documents\\MSISS 4TH YEAR\\FYP\\Notes and Misc\\6670St
 # These addresses are stored in 'dataset'
 dataset = np.genfromtxt(path, delimiter=',', skip_header=1)
 students = dataset[:, [1, 2, 3]]
+"""
+To save time, stops will be read in
+"""
+path2 = "C:\\Users\\diarm\\PycharmProjects\\FinalYearProject\\movedStops29MarchPostAmalg.csv"
+# These addresses are stored in 'dataset'
+dataset3 = pd.read_csv(path2)
+datasetnp = dataset3.to_numpy()
+movedStops = datasetnp[:, 1:]
+
+busStops, students = clustering.student_reassignment(movedStops, students)
+distance_matrix = routing.graphhopper_matrix(busStops)
+
+solution = routing.ortools_routing(busStops, distance_matrix)
+
+walking_matrix = routing.student_stop_walking_distances(students, busStops)
+busStops, students = clustering.new_student_reassignment(busStops, students, walking_matrix)
+
+
+
+
+"""
 busStops, students = clustering.kmeans_constrained_cluster(students) # These bus Stops are independent of roads,
 # snap to roads
 busStops2 = clustering.snap_stops_to_roads(busStops) # this method takes a long time, write to csv after
@@ -24,12 +45,11 @@ distance_matrix = routing.graphhopper_matrix(busStops3)
 busStops4 = clustering.stop_amalgamation(busStops3, distance_matrix)
 # reassign students
 busStops5, students3 = clustering.student_reassignment(busStops4, students2)
+"""
 
-movedStopsDF = pd.DataFrame(busStops5)
-movedStopsDF.to_csv("movedStops29MarchPostAmalg.csv") # This is post amalgamation, written to csv. Write students too
 
-studentsDF = pd.DataFrame(students3)
-studentsDF.to_csv("students29March.csv")
+
+
 
 
 
