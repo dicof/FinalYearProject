@@ -11,15 +11,45 @@ import routing101 as routing
 path = "C:\\Users\\diarm\\Documents\\MSISS 4TH YEAR\\FYP\\Notes and Misc\\6670Students.csv"
 # These addresses are stored in 'dataset'
 dataset = np.genfromtxt(path, delimiter=',', skip_header=1)
-students = dataset[:, [1, 2, 3]]
+students = dataset[0:30, [1, 2, 3]]
+
+bus_stops, students = clustering.distance_constrained_cluster(students)
+bus_stops_snapped = clustering.snap_stops_to_roads(bus_stops)
+distance_matrix = routing.graphhopper_matrix(bus_stops_snapped)
+# bus_stops_amalgamated = clustering.stop_amalgamation(bus_stops_snapped, distance_matrix)
+walking_matrix = routing.student_stop_walking_distances(students, bus_stops_snapped)
+bus_stops_reassigned, students_reassigned = clustering.new_student_reassignment(
+    bus_stops_snapped, students, walking_matrix)
+
+# Weird test idea
+
+over_400 = students_reassigned[students_reassigned[:, 4] > 400]
+max_stop_ID = np.max(bus_stops_reassigned[:, 0].astype(float))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 """
 To save time, stops will be read in
-"""
+
 path2 = "C:\\Users\\diarm\\PycharmProjects\\FinalYearProject\\movedStops29MarchPostAmalg.csv"
-# These addresses are stored in 'dataset'
 dataset3 = pd.read_csv(path2)
 datasetnp = dataset3.to_numpy()
 movedStops = datasetnp[:, 1:]
+
+# These addresses are stored in 'dataset'
+
 
 busStops, students = clustering.student_reassignment(movedStops, students)
 distance_matrix = routing.graphhopper_matrix(busStops)
@@ -29,7 +59,7 @@ solution = routing.ortools_routing(busStops, distance_matrix)
 walking_matrix = routing.student_stop_walking_distances(students, busStops)
 busStops, students = clustering.new_student_reassignment(busStops, students, walking_matrix)
 
-
+"""
 
 
 """
