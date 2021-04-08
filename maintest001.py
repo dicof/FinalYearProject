@@ -7,11 +7,11 @@ import numpy as np
 import pandas as pd
 import clustering101 as clustering
 import routing101 as routing
-
+"""
 path = "C:\\Users\\diarm\\Documents\\MSISS 4TH YEAR\\FYP\\Notes and Misc\\6670Students.csv"
 # These addresses are stored in 'dataset'
 dataset = np.genfromtxt(path, delimiter=',', skip_header=1)
-students = dataset[0:30, [1, 2, 3]]
+students = dataset[:, [1, 2, 3]]
 
 bus_stops, students = clustering.distance_constrained_cluster(students)
 bus_stops_snapped = clustering.snap_stops_to_roads(bus_stops)
@@ -22,10 +22,18 @@ bus_stops_reassigned, students_reassigned = clustering.new_student_reassignment(
     bus_stops_snapped, students, walking_matrix)
 
 # Weird test idea
+#depotMatrix = routing.graphhopper_matrix_depot(bus_stops_reassigned, [44.72048, -63.69856])
+solution = routing.ortools_routing(bus_stops_reassigned)
+"""
+path = "C:\\Users\\diarm\\PycharmProjects\\FinalYearProject\\stops8April.csv"
+path2 = "C:\\Users\\diarm\\PycharmProjects\\FinalYearProject\\students8April.csv"
+stops = pd.read_csv(path)
+students = pd.read_csv(path2)
+bus_stops = np.array(stops)
+students = np.array(students)
 
-over_400 = students_reassigned[students_reassigned[:, 4] > 400]
-max_stop_ID = np.max(bus_stops_reassigned[:, 0].astype(float))
-
+distance_matrix = routing.graphhopper_matrix_depot(bus_stops)
+solution = routing.ortools_routing(bus_stops, distance_matrix)
 
 
 

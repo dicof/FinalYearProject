@@ -179,13 +179,40 @@ def add_extra_stops(students, max_stop_ID):
     bus_stops = np.insert(centers, 2, counts, axis=1)
     # Adding unique stop id so stops can be referred to without their row index, which allows safer dropping of
     # stops
-    stop_IDs = range(max_stop_ID + 1, (len(bus_stops) + max_stop_ID + 1))
+    stop_IDs = range(int(max_stop_ID) + 1, (len(bus_stops) + int(max_stop_ID) + 1))
     bus_stops = np.insert(bus_stops, 0, stop_IDs, axis=1)
     # Things that need to be returned: array of busStops, students
     # with y_k_means appended
     # Now stop IDs have been added, students should use that
     students[:, 3] = (y_k_means + max_stop_ID + 1)
     return bus_stops, students
+
+
+def snap_new_stops_to_roads_new_around_system(new_stops):
+    """
+    This function snaps the newly created stops to suitable roads. It differs from the other snapping function in that
+    it moves the permissible search distance for roads out step by step, aiming to find the closest suitable road to
+    the stop location.
+    :param new_stops:
+    :return: fixed_stops
+    """
+
+    start = time.time()
+    fixed_coords = []
+    for i in range(0, len(new_stops)):
+        test_coords = new_stops[i, [1, 2]]
+        fix = busStopCheck.return_suitable_location_outSearch(test_coords)  # \\TODO: AGAIN CHANGE NAMING IN BSC
+        fixed_coords.append(fix)
+
+        print(i)
+    end = time.time()
+    print(str(end - start) + " seconds to complete stop relocation.")
+    changed_stops = np.array(fixed_coords, dtype=object)
+    fixed_stops = np.insert(changed_stops, 0, new_stops[:, 0], axis=1)
+    # busStops now has lat, lon, distance moved, type road moved to
+    # Drop any stops with none as road #\\TODO: Check this
+    fixed_stops = fixed_stops[fixed_stops[:, 4] != 'none']
+    return fixed_stops
 
 
 
@@ -334,7 +361,7 @@ def new_student_reassignment(bus_stops, students, walking_matrix):
         students[:, 4] = new_distances
     # Certain stops will have no students assigned
 
-    bus_stops = bus_stops[bus_stops[:, 5] != '0']
+    bus_stops = bus_stops[bus_stops[:, 5] != 0]
     # This analytics bit might go somewhere else
     max_walking_distance = max(new_distances)
     average_walking_distance = np.average(new_distances)
