@@ -125,7 +125,7 @@ def ortools_routing(busStops, graphhopperJson):
     """ Takes in bus stops and distance matrix and performs OR-Tools routing"""
     # instatiate the data model
     depot = [44.72048, -63.69856]
-    #graphhopperJson = graphhopper_matrix_depot(busStops, depot)
+    # graphhopperJson = graphhopper_matrix_depot(busStops, depot)
     data = create_data_model(graphhopperJson, busStops)
     # Create the routing index manager.
     manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']),
@@ -188,6 +188,7 @@ def create_data_model(graphhopperJson, busStops):
     VEHICLECAPACITY = 70  # This is the maximum number of students that the buses can fit.
     data = {}
     data['distance_matrix'] = graphhopperJson['distances']
+    data['time_matrix'] = graphhopperJson['times']
     data['num_vehicles'] = NUMBERVEHICLES
     data['depot'] = 0  # Index of the depot in the distance matrix
 
@@ -201,55 +202,71 @@ def create_data_model(graphhopperJson, busStops):
 def print_solution(data, manager, routing, solution):
     """Prints solution on console."""
     # \\TODO: Change row ID to stop ID [or store row ID's]
+    max_index = len(data['time_matrix'])
     total_distance = 0
     total_load = 0
-    solutionSet = [[] for i in range(data['num_vehicles'])]
+    solutionSet = [[(0, 0, 0)] for i in range(data['num_vehicles'])]
     for vehicle_id in range(data['num_vehicles']):
         index = routing.Start(vehicle_id)
-        plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
-        route_distance = 0
-        route_load = 0
-        while not routing.IsEnd(index):
-            node_index = manager.IndexToNode(index)
-            route_load += data['students'][node_index]
-            plan_output += ' {0} Load({1}) -> '.format(node_index, route_load)
-            previous_index = index
-            index = solution.Value(routing.NextVar(index))
-            route_distance += routing.GetArcCostForVehicle(
-                previous_index, index, vehicle_id)
-            solutionSet[vehicle_id].append((index, route_distance))
-        plan_output += ' {0} Load({1})\n'.format(manager.IndexToNode(index),
-                                                 route_load)
-        plan_output += 'Distance of the route: {}m\n'.format(route_distance)
-        plan_output += 'Load of the route: {}\n'.format(route_load)
-        print(plan_output)
-        total_distance += route_distance
-        total_load += route_load
+        length = routing.IsVehicleUsed(solution, vehicle_id)
+        if length:
+            plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
+            route_distance = 0
+            route_load = 0
+            route_time = 0
+            while not routing.IsEnd(index):
+                node_index = manager.IndexToNode(index)
+                route_load += data['students'][node_index]
+                plan_output += ' {0} Load({1}) -> '.format(node_index, route_load)
+                previous_index = index
+                index = solution.Value(routing.NextVar(index))
+                route_distance += routing.GetArcCostForVehicle(
+                    previous_index, index, vehicle_id)
+                print(str(previous_index) + ", " + str(index))
+                if previous_index >= max_index:
+                    # Replace with depot
+                    route_time += data['time_matrix'][0][index]
+                    solutionSet[vehicle_id].append((index, route_distance, route_time))
+                elif index >= max_index:
+                    # Replace with depot
+                    route_time += data['time_matrix'][previous_index][0]
+                    solutionSet[vehicle_id].append((0, route_distance, route_time))
+                else:
+                    route_time += data['time_matrix'][previous_index][index]
+                    solutionSet[vehicle_id].append((index, route_distance, route_time))
+            plan_output += ' {0} Load({1})\n'.format(manager.IndexToNode(index),
+                                                     route_load)
+            plan_output += 'Distance of the route: {}m\n'.format(route_distance)
+            plan_output += 'Load of the route: {}\n'.format(route_load)
+            print(plan_output)
+            total_distance += route_distance
+            total_load += route_load
+        else:
+            print("Vehicle {} is unused".format(vehicle_id))
+
     print('Total distance of all routes: {}m'.format(total_distance))
     print('Total load of all routes: {}'.format(total_load))
-    #print(solutionSet)
+    # print(solutionSet)
     return solutionSet
 
 
-def turn_indexes_to_stops(solutionSet, busStops):
+def turn_indexes_to_stops(solution_set, bus_stops):
     """
     This [hopefully temporary] method aims to turn the solution sets, which refer to row indexes, into
     routes of stop IDs.
     """
-    stopIDSets = [[0, 44.72048, -63.69856] for i in range(len(solutionSet))]
-    for i in range(0, len(solutionSet)):
-        # i refers to the vehicle route
-        if len(solutionSet[i]) != 1:
-            # Non empty list = used bus
-            for j in range(0, len(solutionSet[i]) - 1):
-                # j is the particular stop on the route
-                currentStopIndex = solutionSet[i][j]
-                currentStopID = busStops[(currentStopIndex - 1), [0, 1, 2]].astype(float)
-                stopIDSets[i].append(currentStopID)
-            stopIDSets[i].append([0, 44.72048, -63.69856]) # If error this is cause
-        stopIDSets[i] = np.array(stopIDSets[i], dtype=object)
-
-    return stopIDSets
+    solution_set_stop_ids = []
+    for i in range(len(solution_set)):
+        # i refers to the route
+        if solution_set[i] != (0, 0, 0):
+            route_numpy = np.array(solution_set[i], dtype=object)
+            for j in range(len(route_numpy)):
+                if route_numpy[j, 0] == 0:
+                    route_numpy[j, 0] = "depot"
+                else:
+                    route_numpy[j, 0] = bus_stops[int(route_numpy[j, 0] - 1), 0]
+        solution_set_stop_ids.append(route_numpy)
+    return solution_set_stop_ids
 
 
 def calculate_student_travel_time(routes, bus_stops, students, walking_matrix):
@@ -260,25 +277,49 @@ def calculate_student_travel_time(routes, bus_stops, students, walking_matrix):
     :param students:
     :return: students
     """
-
+    students_total_travel_time = []
     for i in range(len(students)):
         # For each student, get walking time to their stop
         students_assigned_stop = students[i, 3]
         student_walking_distance = students[i, 4]
         walking_matrix_index = np.argwhere(walking_matrix['distances'][i] == student_walking_distance)[0][0]
-        walking_time_to_stop = walking_matrix['times'][i][walking_matrix_index] # in minutes
-        # Now have to get the distance travelled on the bus
-
-
-
-    """
-    for i in range(len(students_reassigned)):
-        # For each student, get walking time to their stop
-        students_assigned_stop = students_reassigned[i, 3]
-        student_walking_distance = students_reassigned[i, 4]
-        walking_matrix_index = np.argwhere(walking_matrix['distances'][i] == student_walking_distance)[0][0]
         walking_time_to_stop = walking_matrix['times'][i][walking_matrix_index]  # in minutes
         # Now have to get the distance travelled on the bus
-        print("Student " + str(i) + " walking " + str(walking_time_to_stop) + " seconds to cover " + 
-        str(student_walking_distance) + "m")
-    """
+        # This is: time at end of journey - time when students got on bus
+        found = False
+        j = 0
+        bus_travel_time = 0
+        while not found:
+            # Check each route for the students' assigned stop
+            if j == len(routes): print("Error: gone past the number of routes")
+            current_route = routes[j]
+            stops_on_route = len(current_route)
+            placeholder = np.argwhere(current_route[:, 0] == students_assigned_stop)
+            if placeholder.size > 0:
+                # This means the stop is in this particular route
+                index_of_stop_on_route = placeholder[0][0]
+                found = True
+                # Take the time at end and time at stop when student gets on
+                when_student_gets_on = current_route[index_of_stop_on_route, 2]
+                when_student_gets_to_school = current_route[(stops_on_route - 1), 2]
+                bus_travel_time = when_student_gets_to_school - when_student_gets_on
+            else:
+                # stop is not on this route, try another
+                j = j + 1
+        total_travel_time = bus_travel_time + walking_time_to_stop
+        students_total_travel_time.append(total_travel_time)
+    students = np.insert(students, 5, students_total_travel_time, axis=1)
+    return students
+
+
+"""
+for i in range(len(students_reassigned)):
+    # For each student, get walking time to their stop
+    students_assigned_stop = students_reassigned[i, 3]
+    student_walking_distance = students_reassigned[i, 4]
+    walking_matrix_index = np.argwhere(walking_matrix['distances'][i] == student_walking_distance)[0][0]
+    walking_time_to_stop = walking_matrix['times'][i][walking_matrix_index]  # in minutes
+    # Now have to get the distance travelled on the bus
+    print("Student " + str(i) + " walking " + str(walking_time_to_stop) + " seconds to cover " + 
+    str(student_walking_distance) + "m")
+"""
