@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import clustering101 as clustering
 import routing101 as routing
+import time
 """
 path = "C:\\Users\\diarm\\Documents\\MSISS 4TH YEAR\\FYP\\Notes and Misc\\6670Students.csv"
 # These addresses are stored in 'dataset'
@@ -33,11 +34,21 @@ bus_stops = np.array(stops)
 students = np.array(students)
 
 distance_matrix = routing.graphhopper_matrix_depot(bus_stops)
-solution = routing.ortools_routing(bus_stops, distance_matrix)
-
-
-
-
+print("Need to allow the graphhopper matrix time to recover before requesting again")
+time.sleep(60)
+print("Time over")
+walking_matrix = routing.student_stop_walking_distances(students, bus_stops)
+routes = routing.ortools_routing(bus_stops, distance_matrix)
+students = routing.calculate_student_travel_time(routes, students, walking_matrix)
+studentsDF = pd.DataFrame(students)
+col_names_students = ["Student Number", "Lat", "Lon", "Assigned Stop", "Walking Distance (m)", "Travel Time (s)"]
+studentsDF.columns = col_names_students
+response = routing.turn_routes_into_csv_visualisation_form(routes, students, bus_stops)
+response.columns = [
+    'vehicle_id', 'sequence', 'latitude', 'longitude',
+    'vehicle_cumul_dist', 'cumul_demands', 'arrival_time',
+    'dist_to_school', 'stop_number', 'node']
+response.to_csv('response_first_test.csv', index=False)
 
 
 

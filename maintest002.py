@@ -44,4 +44,4 @@ solution = routing.ortools_routing(bus_stops_reassigned2, distance_matrix)
 
 col_names_stops = ["Stop ID",
                    "Lat", "Lon", "Distance Moved", "Road Type", "Students At Stop", "Average Walking Distance"]
-col_names_students = ["Student Number", "Lat", "Lon", "Assigned Stop", "Walking Distance"]
+col_names_students = ["Student Number", "Lat", "Lon", "Assigned Stop", "Walking Distance (m)", "Travel Time (s)"]

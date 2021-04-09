@@ -10,6 +10,7 @@ import time
 import requests
 import json
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
+import datetime
 
 """
 Like clustering101, the aim of this file is to reform the routing methods into a single file,
@@ -175,8 +176,10 @@ def ortools_routing(busStops, graphhopperJson):
 
     # Print solution on console.
     if solution:
-        solutionSet = print_solution(data, manager, routing, solution)
-        return solutionSet
+        solution_set = print_solution(data, manager, routing, solution)
+        solution_set_turned_to_stops = turn_indexes_to_stops(solution_set, busStops)
+        routes = calculate_arrival_times(solution_set_turned_to_stops)
+        return routes
 
     else:
         print("No solution.")
@@ -205,7 +208,7 @@ def print_solution(data, manager, routing, solution):
     max_index = len(data['time_matrix'])
     total_distance = 0
     total_load = 0
-    solutionSet = [[(0, 0, 0)] for i in range(data['num_vehicles'])]
+    solutionSet = [[(0, 0, 0, 0)] for i in range(data['num_vehicles'])]
     for vehicle_id in range(data['num_vehicles']):
         index = routing.Start(vehicle_id)
         length = routing.IsVehicleUsed(solution, vehicle_id)
@@ -220,20 +223,23 @@ def print_solution(data, manager, routing, solution):
                 plan_output += ' {0} Load({1}) -> '.format(node_index, route_load)
                 previous_index = index
                 index = solution.Value(routing.NextVar(index))
+                # Attempt to fix cumul_load
+                new_node_index = manager.IndexToNode(index)
+                temp_route_load = route_load + data['students'][new_node_index]
                 route_distance += routing.GetArcCostForVehicle(
                     previous_index, index, vehicle_id)
                 print(str(previous_index) + ", " + str(index))
                 if previous_index >= max_index:
                     # Replace with depot
                     route_time += data['time_matrix'][0][index]
-                    solutionSet[vehicle_id].append((index, route_distance, route_time))
+                    solutionSet[vehicle_id].append((index, route_distance, route_time, temp_route_load))
                 elif index >= max_index:
                     # Replace with depot
                     route_time += data['time_matrix'][previous_index][0]
-                    solutionSet[vehicle_id].append((0, route_distance, route_time))
+                    solutionSet[vehicle_id].append((0, route_distance, route_time, 0))
                 else:
                     route_time += data['time_matrix'][previous_index][index]
-                    solutionSet[vehicle_id].append((index, route_distance, route_time))
+                    solutionSet[vehicle_id].append((index, route_distance, route_time, temp_route_load))
             plan_output += ' {0} Load({1})\n'.format(manager.IndexToNode(index),
                                                      route_load)
             plan_output += 'Distance of the route: {}m\n'.format(route_distance)
@@ -254,11 +260,13 @@ def turn_indexes_to_stops(solution_set, bus_stops):
     """
     This [hopefully temporary] method aims to turn the solution sets, which refer to row indexes, into
     routes of stop IDs.
+
+
     """
     solution_set_stop_ids = []
     for i in range(len(solution_set)):
         # i refers to the route
-        if solution_set[i] != (0, 0, 0):
+        if solution_set[i] != (0, 0, 0, 0):
             route_numpy = np.array(solution_set[i], dtype=object)
             for j in range(len(route_numpy)):
                 if route_numpy[j, 0] == 0:
@@ -268,12 +276,44 @@ def turn_indexes_to_stops(solution_set, bus_stops):
         solution_set_stop_ids.append(route_numpy)
     return solution_set_stop_ids
 
+def calculate_arrival_times(routes):
+    """
+    Adds arrival times to the routes, working backwards so that each bus arrives at the school at 9:20
+    :param routes:
+    :return: routes
+    """
+    # Start at the bottom, work up, taking the travel time off the seconds at midnight
+    finished_routes = []
+    for i in range(len(routes)):
+        # i is each vehicle
+        intended_arrival_time = datetime.time(hour=9, minute=20)
+        seconds_since_midnight_at_arrival = datetime.timedelta(
+            hours=intended_arrival_time.hour, minutes=intended_arrival_time.minute,
+            seconds=intended_arrival_time.second).total_seconds()
+        current_route = routes[i]
+        current_route_arrival_times = []
+        number_of_stops = len(current_route)
+        if number_of_stops != 1:
+            # unused vehicles
+            arrival_times = [0]*number_of_stops
+            current_route = np.insert(current_route, 4, arrival_times, axis=1)
+            for j in range(number_of_stops-1, 0, -1):
+                # arrival time is seconds since midnight, which will be adjusted as the loop goes on
+                current_route[j, 4] = seconds_since_midnight_at_arrival
+                difference = current_route[j][2]-current_route[j-1][2]
+                seconds_since_midnight_at_arrival = seconds_since_midnight_at_arrival - difference
+        finished_routes.append(current_route)
 
-def calculate_student_travel_time(routes, bus_stops, students, walking_matrix):
+    return finished_routes
+
+
+
+
+def calculate_student_travel_time(routes, students, walking_matrix):
     """
     Calculates each student's travel time to the school
+    :param walking_matrix:
     :param routes:
-    :param bus_stops:
     :param students:
     :return: students
     """
@@ -323,3 +363,55 @@ for i in range(len(students_reassigned)):
     print("Student " + str(i) + " walking " + str(walking_time_to_stop) + " seconds to cover " + 
     str(student_walking_distance) + "m")
 """
+
+
+
+def turn_routes_into_csv_visualisation_form(routes, students, bus_stops):
+    """
+    This function will turn the routes into a form that can be visualised using Garry's prototype visualisation
+    Colnames: vehicle_id, sequence, lat, lon, vehicle_cumul_dist, cumul_demands, arrival_time
+    :param routes:
+    :param students:
+    :param bus_stops:
+    :return:
+    """
+    final_response = []
+    for i in range(len(routes)):
+        if len(routes[i]) != 1:
+            # unused buses just feature one entry of ('depot', 0, 0)
+            vehicle_id = "180-A-" + str(i)
+            for j in range(len(routes[i])):
+                # each j represents a different bus stop on the route
+                response = []
+                current_stop = routes[i][j]
+                if current_stop[1] != 0:
+                    # this is to exclude the depot, which isn't needed in the output
+                    response.append(vehicle_id)
+                    response.append(j) # sequence
+                    # Need to get lat and lon of stop using stop id
+                    current_stop_id = current_stop[0]
+                    if current_stop_id != 'depot':
+                        # this is to exclude the final depot, which does need to be included in the output
+                        index = np.argwhere(bus_stops[:, 0] == current_stop_id)[0][0]
+                        lat = bus_stops[index, 1]
+                        lon = bus_stops[index, 2]
+                        response.append(lat)
+                        response.append(lon)
+                    else:
+                        # This is the final depot
+                        lat = 44.72048
+                        lon = -63.69856
+                        response.append(lat)
+                        response.append(lon)
+                    response.append(current_stop[1]) # vehicle cumulative distance
+                    response.append(current_stop[3]) # number students on vehicle
+                    response.append(current_stop[4]/86400) # number seconds since midnight \\TODO: CHange this
+                    # distance to school
+                    response.append(600)
+                    # stop number
+                    response.append(current_stop[0])
+                    # node ???
+                    response.append(1)
+                    final_response.append(response)
+    final_responsePD = pd.DataFrame(final_response)
+    return final_responsePD
