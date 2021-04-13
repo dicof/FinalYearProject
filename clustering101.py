@@ -13,6 +13,8 @@ import numpy as np
 import busStopCheck
 import time
 
+import routing101 as route
+
 
 # CLEANED
 def distance_constrained_cluster(students):
@@ -184,11 +186,12 @@ def add_extra_stops(students, max_stop_ID):
     # Things that need to be returned: array of busStops, students
     # with y_k_means appended
     # Now stop IDs have been added, students should use that
-    students[:, 3] = (y_k_means + max_stop_ID + 1)
-    return bus_stops, students
+    # students[:, 3] = (y_k_means + max_stop_ID + 1)
+
+    return bus_stops
 
 
-def snap_new_stops_to_roads_new_around_system(new_stops):
+def snap_stops_to_roads_iterative_search(new_stops):
     """
     This function snaps the newly created stops to suitable roads. It differs from the other snapping function in that
     it moves the permissible search distance for roads out step by step, aiming to find the closest suitable road to
@@ -211,9 +214,18 @@ def snap_new_stops_to_roads_new_around_system(new_stops):
     fixed_stops = np.insert(changed_stops, 0, new_stops[:, 0], axis=1)
     # busStops now has lat, lon, distance moved, type road moved to
     # Drop any stops with none as road #\\TODO: Check this
+    length_before_dropping_unmoved = len(fixed_stops)
     fixed_stops = fixed_stops[fixed_stops[:, 4] != 'none']
-    return fixed_stops
+    length_after_dropping_unmoved = len(fixed_stops)
+    print(
+        str(length_before_dropping_unmoved - length_after_dropping_unmoved) + " stops unsuccessfully moved. Now " + str(
+            length_after_dropping_unmoved) + " stops remaining.")
+    unique, counts = np.unique(fixed_stops[:, 4], return_counts=True)
+    print("Categories of stops:")
+    list_of_stops = list(zip(unique, counts))
+    print(np.array(list_of_stops))
 
+    return fixed_stops
 
 
 # CLEANED, UNUSED \\TODO: EITHER USE OR DELETE
@@ -308,7 +320,34 @@ def stop_amalgamation(bus_stops, distance_matrix):
     return bus_stops
 
 
-def new_student_reassignment(bus_stops, students, walking_matrix):
+def new_stop_amalgamation(students, bus_stops, distance_matrix, walking_matrix):
+    """
+    For every stop, this function will
+    1) Get students at stop
+    2) Check if there are any stops in the vicinity that they can all walk to
+    3) Evaluate which stop is better located by distance matrix, and move all students to that stop.
+    4) Set students at old stop to zero
+
+    :param students:
+    :param bus_stops:
+    :param distance_matrix:
+    :param walking_matrix:
+    :return:
+    """
+    distance_matrix_np = np.array(distance_matrix['distances'])
+    walking_matrix_np = np.array(walking_matrix['distances'])
+    for i in len(bus_stops):
+        # i = stop
+        stop_id = bus_stops[i, 0]
+        students_at_stop = students[students[:, 3] == stop_id]
+        suitable_stops = []
+        for student in len(students_at_stop):
+            # For each student, get the index of every stop that is within 400 metres
+            print("temp")
+        # Check if stop is superceded
+
+
+def student_reassignment_walking_matrix(bus_stops, students, walking_matrix):
     """
     New method that reassigns students based on the graphhhopper API walking distance matrix. This API has a minutely
     limit that is very easy to violate, so this method must either be used sparingly or be surrounded by a try/catch
@@ -474,3 +513,53 @@ def student_reassignment(bus_stops, students):
     plt.show()
     """
     return bus_stops, students
+
+
+def stop_creation_loop(students):
+    """
+    This function maintains the bus stop creation loop. In this loop,
+    1) Bus stops, created independent of the road network by the distance constrained clustering method, are snapped
+        to the nearest suitable location using the Overpass API (which works on OpenStreetMap data)
+    2) A walking matrix is created between each student and every existing stop
+    3) This walking matrix is used to assign each student to their closest bus stop
+    4) Any students that are still having to walk over 400 metres are sent back to the distance constrained clustering
+        method
+
+    This loop is continued until either: all students are walking below 400 metres to get to their nearest bus stop, or
+    there is no change between iterations
+    :param students:
+    :return:
+    """
+    max_stop_id = 100
+    previous_bus_stops = np.array([])
+    initial_students = students
+    number_of_students_over_constraint = -1
+    convergence = False
+    final_stops = []
+    final_students = []
+    while not convergence:
+        new_stops = add_extra_stops(students, max_stop_id)
+        new_stops = snap_stops_to_roads_iterative_search(new_stops)
+        if previous_bus_stops.size != 0:
+            # need to combine new bus stops with previous bus stops
+            print("New bus stops being combined with old.")
+            new_stops = np.concatenate((previous_bus_stops[:, 0:5], new_stops))
+
+        walking_matrix = route.student_stop_walking_distances(students, new_stops)
+        moved_stops_reassigned, students_reassigned = student_reassignment_walking_matrix(
+            new_stops, initial_students, walking_matrix)
+        overs = students_reassigned[students_reassigned[:, 4] >= 400]
+        new_number_of_students_over_constraint = len(overs)
+        if new_number_of_students_over_constraint == number_of_students_over_constraint or \
+                new_number_of_students_over_constraint == 0:
+            # convergence: solution is stable OR no students over walking constraint
+            convergence = True
+            final_stops = moved_stops_reassigned
+            final_students = students_reassigned
+        else:
+            # solution might benefit from going again
+            max_stop_id = np.max(moved_stops_reassigned[:, 0])
+            previous_bus_stops = moved_stops_reassigned
+            students = overs
+
+    return final_stops, final_students

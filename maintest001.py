@@ -39,7 +39,7 @@ time.sleep(60)
 print("Time over")
 walking_matrix = routing.student_stop_walking_distances(students, bus_stops)
 routes = routing.ortools_routing(bus_stops, distance_matrix)
-students = routing.calculate_student_travel_time(routes, students, walking_matrix)
+students2 = routing.calculate_student_travel_time(routes, students, walking_matrix)
 studentsDF = pd.DataFrame(students)
 col_names_students = ["Student Number", "Lat", "Lon", "Assigned Stop", "Walking Distance (m)", "Travel Time (s)"]
 studentsDF.columns = col_names_students

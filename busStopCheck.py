@@ -641,7 +641,7 @@ def return_suitable_location_outSearch(coords):
                 turning_circle_coords = []
                 for i in range(0, number_roads):
                     current_road = json_data['elements'][i]['tags']
-                    print(json_data['elements'][i])
+                    #print(json_data['elements'][i])
                     type_road = json_data['elements'][i]['tags']['highway']
                     print(current_road)
                     current_road_priority = 0

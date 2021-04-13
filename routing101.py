@@ -18,10 +18,10 @@ joining together the distanceMatrix and or-tools sections
 """
 
 
-def graphhopper_matrix_depot(busStops):
+def graphhopper_matrix_depot(bus_stops):
     """ Takes in bus stops and depot (school), and returns distance matrix """
     depot = [44.72048, -63.69856]
-    coords = np.insert(busStops[:, [1, 2]].astype(float), 0, depot, axis=0)
+    coords = np.insert(bus_stops[:, [1, 2]].astype(float), 0, depot, axis=0)
     Long = pd.core.series.Series(coords[:, 1])
     Lat = pd.core.series.Series(coords[:, 0])
     locationArray = list(zip(Long, Lat))
@@ -46,23 +46,23 @@ def graphhopper_matrix_depot(busStops):
     return json_data
 
 
-def student_stop_walking_distances(students, busStops):
+def student_stop_walking_distances(students, bus_stops):
     """The aim of this function is to get the walking distance and time for each student to their bus stop"""
-    studentCoords = students[:, [1, 2]]
-    Long = pd.core.series.Series(studentCoords[:, 1])
-    Lat = pd.core.series.Series(studentCoords[:, 0])
-    studentsArray = list(zip(Long, Lat))
+    student_coords = students[:, [1, 2]]
+    Long = pd.core.series.Series(student_coords[:, 1])
+    Lat = pd.core.series.Series(student_coords[:, 0])
+    students_array = list(zip(Long, Lat))
 
     # Need to get the location of the stop that that student is going to
 
-    stopCoords = busStops[:, [1, 2]]
-    Long = pd.core.series.Series(stopCoords[:, 1])
-    Lat = pd.core.series.Series(stopCoords[:, 0])
-    stopArray = list(zip(Long, Lat))
+    stop_coords = bus_stops[:, [1, 2]]
+    Long = pd.core.series.Series(stop_coords[:, 1])
+    Lat = pd.core.series.Series(stop_coords[:, 0])
+    stop_array = list(zip(Long, Lat))
     URL = "https://graphhopper.com/api/1/matrix?key=4e2c94b1-14ff-4eb5-8122-cacf2e34043d&ch.disable=true"
 
-    payload = {"from_points": studentsArray,
-               "to_points": stopArray,
+    payload = {"from_points": students_array,
+               "to_points": stop_array,
                "vehicle": "foot",
                "out_arrays": ["times", "distances"]}
 
@@ -77,34 +77,35 @@ def student_stop_walking_distances(students, busStops):
     json_data = json.loads(r.text)
 
     # print(json_data)
+
     return json_data
 
 
-def check_walking_distances(students, busStops, walking_matrix):
+def check_walking_distances(students, bus_stops, walking_matrix):
     """Checks walking distances from the graphhopper matrix"""
-    walkingDistances = []
+    walking_distances = []
     for i in range(len(students)):
         # Get id for stop that student is assigned to
-        stopID = students[i, 3]
-        stopIndex = np.argwhere(busStops[:, 0] == stopID)[0][0]
-        walkingDistance = walking_matrix['distances'][i][stopIndex]
-        print("student walking distance = " + str(walkingDistance) + ". Crow = " + str(students[i, 4]))
-        walkingDistances.append(walkingDistance)
+        stop_ID = students[i, 3]
+        stop_index = np.argwhere(bus_stops[:, 0] == stop_ID)[0][0]
+        walking_distance = walking_matrix['distances'][i][stop_index]
+        print("student walking distance = " + str(walking_distance) + ". Crow = " + str(students[i, 4]))
+        walking_distances.append(walking_distance)
 
-    print("Average walking distance = " + str(np.average(walkingDistances)))
-    return walkingDistances
+    print("Average walking distance = " + str(np.average(walking_distances)))
+    return walking_distances
 
 
-def graphhopper_matrix(busStops):
+def graphhopper_matrix(bus_stops):
     """ takes in just the bus stops and returns a distance matrix"""
-    coords = busStops[:, [1, 2]]
+    coords = bus_stops[:, [1, 2]]
     Long = pd.core.series.Series(coords[:, 1])
     Lat = pd.core.series.Series(coords[:, 0])
-    locationArray = list(zip(Long, Lat))
-    curbsides = ["right"] * len(busStops)
+    location_array = list(zip(Long, Lat))
+    curbsides = ["right"] * len(bus_stops)
     URL = "https://graphhopper.com/api/1/matrix?key=4e2c94b1-14ff-4eb5-8122-cacf2e34043d&ch.disable=true"
 
-    payload = {"points": locationArray,
+    payload = {"points": location_array,
                "vehicle": "car",
                # "curbsides": curbsides,
                "out_arrays": ["times", "distances"]}
@@ -118,16 +119,18 @@ def graphhopper_matrix(busStops):
     print(end - start)
 
     json_data = json.loads(r.text)
-
+    if not json_data['distances']:
+        # No response, must not have worked properly.
+        print("ERROR: NO DISTANCE RESPONSE FROM GRAPHHOPPER STUDENT STOP MATRIX")
     return json_data
 
 
-def ortools_routing(busStops, graphhopperJson):
+def ortools_routing(bus_stops, graphhopper_Json):
     """ Takes in bus stops and distance matrix and performs OR-Tools routing"""
     # instatiate the data model
     depot = [44.72048, -63.69856]
     # graphhopperJson = graphhopper_matrix_depot(busStops, depot)
-    data = create_data_model(graphhopperJson, busStops)
+    data = create_data_model(graphhopper_Json, bus_stops)
     # Create the routing index manager.
     manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']),
                                            data['num_vehicles'], data['depot'])
@@ -177,7 +180,7 @@ def ortools_routing(busStops, graphhopperJson):
     # Print solution on console.
     if solution:
         solution_set = print_solution(data, manager, routing, solution)
-        solution_set_turned_to_stops = turn_indexes_to_stops(solution_set, busStops)
+        solution_set_turned_to_stops = turn_indexes_to_stops(solution_set, bus_stops)
         routes = calculate_arrival_times(solution_set_turned_to_stops)
         return routes
 
@@ -185,19 +188,19 @@ def ortools_routing(busStops, graphhopperJson):
         print("No solution.")
 
 
-def create_data_model(graphhopperJson, busStops):
+def create_data_model(graphhopper_Json, bus_stops):
     """Stores the data for the problem."""
-    NUMBERVEHICLES = 20  # This is where you change the maximum number of vehicles
-    VEHICLECAPACITY = 70  # This is the maximum number of students that the buses can fit.
+    NUMBER_VEHICLES = 20  # This is where you change the maximum number of vehicles
+    VEHICLE_CAPACITY = 70  # This is the maximum number of students that the buses can fit.
     data = {}
-    data['distance_matrix'] = graphhopperJson['distances']
-    data['time_matrix'] = graphhopperJson['times']
-    data['num_vehicles'] = NUMBERVEHICLES
+    data['distance_matrix'] = graphhopper_Json['distances']
+    data['time_matrix'] = graphhopper_Json['times']
+    data['num_vehicles'] = NUMBER_VEHICLES
     data['depot'] = 0  # Index of the depot in the distance matrix
 
     # students at each stop: also demand at each stop
-    data['students'] = np.insert(busStops[:, 5].astype(int), 0, 0, axis=0)
-    data['vehicle_capacities'] = [VEHICLECAPACITY] * NUMBERVEHICLES
+    data['students'] = np.insert(bus_stops[:, 5].astype(int), 0, 0, axis=0)
+    data['vehicle_capacities'] = [VEHICLE_CAPACITY] * NUMBER_VEHICLES
 
     return data
 
@@ -208,7 +211,7 @@ def print_solution(data, manager, routing, solution):
     max_index = len(data['time_matrix'])
     total_distance = 0
     total_load = 0
-    solutionSet = [[(0, 0, 0, 0)] for i in range(data['num_vehicles'])]
+    solution_set = [[(0, 0, 0, 0)] for i in range(data['num_vehicles'])]
     for vehicle_id in range(data['num_vehicles']):
         index = routing.Start(vehicle_id)
         length = routing.IsVehicleUsed(solution, vehicle_id)
@@ -232,14 +235,14 @@ def print_solution(data, manager, routing, solution):
                 if previous_index >= max_index:
                     # Replace with depot
                     route_time += data['time_matrix'][0][index]
-                    solutionSet[vehicle_id].append((index, route_distance, route_time, temp_route_load))
+                    solution_set[vehicle_id].append((index, route_distance, route_time, temp_route_load))
                 elif index >= max_index:
                     # Replace with depot
                     route_time += data['time_matrix'][previous_index][0]
-                    solutionSet[vehicle_id].append((0, route_distance, route_time, 0))
+                    solution_set[vehicle_id].append((0, route_distance, route_time, 0))
                 else:
                     route_time += data['time_matrix'][previous_index][index]
-                    solutionSet[vehicle_id].append((index, route_distance, route_time, temp_route_load))
+                    solution_set[vehicle_id].append((index, route_distance, route_time, temp_route_load))
             plan_output += ' {0} Load({1})\n'.format(manager.IndexToNode(index),
                                                      route_load)
             plan_output += 'Distance of the route: {}m\n'.format(route_distance)
@@ -253,7 +256,7 @@ def print_solution(data, manager, routing, solution):
     print('Total distance of all routes: {}m'.format(total_distance))
     print('Total load of all routes: {}'.format(total_load))
     # print(solutionSet)
-    return solutionSet
+    return solution_set
 
 
 def turn_indexes_to_stops(solution_set, bus_stops):
@@ -350,20 +353,6 @@ def calculate_student_travel_time(routes, students, walking_matrix):
         students_total_travel_time.append(total_travel_time)
     students = np.insert(students, 5, students_total_travel_time, axis=1)
     return students
-
-
-"""
-for i in range(len(students_reassigned)):
-    # For each student, get walking time to their stop
-    students_assigned_stop = students_reassigned[i, 3]
-    student_walking_distance = students_reassigned[i, 4]
-    walking_matrix_index = np.argwhere(walking_matrix['distances'][i] == student_walking_distance)[0][0]
-    walking_time_to_stop = walking_matrix['times'][i][walking_matrix_index]  # in minutes
-    # Now have to get the distance travelled on the bus
-    print("Student " + str(i) + " walking " + str(walking_time_to_stop) + " seconds to cover " + 
-    str(student_walking_distance) + "m")
-"""
-
 
 
 def turn_routes_into_csv_visualisation_form(routes, students, bus_stops):
