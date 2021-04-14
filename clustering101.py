@@ -537,8 +537,13 @@ def stop_creation_loop(students):
     convergence = False
     final_stops = []
     final_students = []
+    running_info = []
+    i = 0
     while not convergence:
+        i = i + 1
+        print("iteration " + str(i))
         new_stops = add_extra_stops(students, max_stop_id)
+        print("Adding " + str(len(new_stops)) + " stops to solution.")
         new_stops = snap_stops_to_roads_iterative_search(new_stops)
         if previous_bus_stops.size != 0:
             # need to combine new bus stops with previous bus stops
@@ -561,5 +566,6 @@ def stop_creation_loop(students):
             max_stop_id = np.max(moved_stops_reassigned[:, 0])
             previous_bus_stops = moved_stops_reassigned
             students = overs
-
-    return final_stops, final_students
+            number_of_students_over_constraint = new_number_of_students_over_constraint
+            running_info.append((len(moved_stops_reassigned), len(overs)))
+    return final_stops, final_students, running_info
