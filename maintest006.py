@@ -24,7 +24,11 @@ print("Time over")
 
 distance_matrix = route.graphhopper_matrix(bus_stops)
 distance_matrix_np = np.array(distance_matrix['distances'])
+old_students = students
+old_stops = bus_stops
+emptied_stops = []
 
+pre_avg_walking_distance = np.average(students[:, 4])
 
 for i in range(len(bus_stops)):
     # i represents the index of the bus stop in question, in the distance matrix and in the bus_stops table
@@ -44,6 +48,7 @@ for i in range(len(bus_stops)):
             potential_stop_average_distance = np.average(distance_matrix_np[potential_stop_index])
             if potential_stop_average_distance < current_stop_average_distance:
                 # Move the student to this stop.
+                moved = True
                 old_average_distance = current_stop_average_distance
                 current_stop_average_distance = potential_stop_average_distance
                 print("student " + str(students[current_student, 0]) + " should be moved to "
@@ -51,9 +56,14 @@ for i in range(len(bus_stops)):
                 print(str(potential_stop_average_distance) + " < " + str(old_average_distance))
                 print("They were walking " + str(walking_matrix_np[current_student, i]))
                 print("They would now be walking " + str(walking_matrix_np[current_student, potential_stop_index]))
-                number_students_at_stop = number_students_at_stop - 1
-                if number_students_at_stop == 0:
-                    print("This would leave stop " + str(bus_stops[i, 0]) + " empty")
+                students[current_student, 3] = bus_stops[potential_stop_index, 0]
+                students[current_student, 4] = walking_matrix_np[current_student, potential_stop_index]
 
 
+for i in range(len(bus_stops)):
+    stop_id = bus_stops[i, 0]
+    students_at_stop = len(np.argwhere(students[:, 3] == stop_id))
+    bus_stops[i, 5] = students_at_stop
+
+new_bus_stops = bus_stops[bus_stops[:, 5] > 0]
 

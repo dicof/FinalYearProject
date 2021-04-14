@@ -190,6 +190,14 @@ def add_extra_stops(students, max_stop_ID):
 
     return bus_stops
 
+def add_final_stops(students, max_stop_ID):
+    """
+    In this final method, any remaining students are assigned a stop directly on their co-ordinates which is
+    snapped to the nearest road
+    :param students:
+    :param max_stop_ID:
+    :return:
+    """
 
 def snap_stops_to_roads_iterative_search(new_stops):
     """
