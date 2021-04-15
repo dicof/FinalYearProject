@@ -344,15 +344,79 @@ def new_stop_amalgamation(students, bus_stops, distance_matrix, walking_matrix):
     """
     distance_matrix_np = np.array(distance_matrix['distances'])
     walking_matrix_np = np.array(walking_matrix['distances'])
-    for i in len(bus_stops):
-        # i = stop
+    pre_avg_walking_distance = np.average(students[:, 4])
+    for i in range(len(bus_stops)):
+        # i represents the index of the bus stop in question, in the distance matrix and in the bus_stops table
         stop_id = bus_stops[i, 0]
-        students_at_stop = students[students[:, 3] == stop_id]
-        suitable_stops = []
-        for student in len(students_at_stop):
-            # For each student, get the index of every stop that is within 400 metres
-            print("temp")
-        # Check if stop is superceded
+
+        students_at_stop = np.argwhere(students[:, 3] == stop_id)
+        number_students_at_stop = len(students_at_stop)
+        student_moved_list = []
+        for j in range(len(students_at_stop)):
+            # j represents each student at the stop
+            current_stop_average_distance = np.average(distance_matrix_np[i])
+            current_student = students_at_stop[j][0]
+            stops_within_400_metres = np.argwhere(walking_matrix_np[current_student] <= 400)
+            student_moved = False
+            for k in range(len(stops_within_400_metres)):
+                # k represents the index of each stop that is within 400 metres of the student.
+                potential_stop_index = stops_within_400_metres[k][0]
+                potential_stop_average_distance = np.average(distance_matrix_np[potential_stop_index])
+                if potential_stop_average_distance < current_stop_average_distance:
+                    # Move the student to this stop.
+                    student_moved = True
+                    old_average_distance = current_stop_average_distance
+                    current_stop_average_distance = potential_stop_average_distance
+            student_moved_list.append(student_moved)
+        # Check whether all the students can be migrated from the stop: otherwise it's not worth doing it
+        if all(student_moved_list):
+            # all students can be moved: proceed with the moving.
+            # This isn't elegant but I can't think of another way to do this
+            # other than going through again and reassigning
+            for j in range(len(students_at_stop)):
+                # j represents each student at the stop
+                current_stop_average_distance = np.average(distance_matrix_np[i])
+                current_student = students_at_stop[j][0]
+                stops_within_400_metres = np.argwhere(walking_matrix_np[current_student] <= 400)
+                for k in range(len(stops_within_400_metres)):
+                    # k represents the index of each stop that is within 400 metres of the student.
+                    potential_stop_index = stops_within_400_metres[k][0]
+                    potential_stop_average_distance = np.average(distance_matrix_np[potential_stop_index])
+                    if potential_stop_average_distance < current_stop_average_distance:
+                        # Move the student to this stop.
+                        old_average_distance = current_stop_average_distance
+                        current_stop_average_distance = potential_stop_average_distance
+                        print("Current stop: " + str(stop_id))
+                        # print(str(len(students_at_stop)) + " students at stop")
+                        print("student " + str(students[current_student, 0]) + " should be moved to "
+                              + str(bus_stops[potential_stop_index, 0]))
+                        print(str(potential_stop_average_distance) + " < " + str(old_average_distance))
+                        print("They were walking " + str(walking_matrix_np[current_student, i]))
+                        print("They would now be walking " + str(
+                            walking_matrix_np[current_student, potential_stop_index]))
+                        students[current_student, 3] = bus_stops[potential_stop_index, 0]
+                        students[current_student, 4] = walking_matrix_np[current_student, potential_stop_index]
+            print("Stop " + str(stop_id) + " is now going to be empty hopefully")
+        # else:
+        # its not worth moving all these students, as the bus still has to go there for one student.
+        # print("Current stop: " + str(stop_id) + ", " + str(number_students_at_stop) + " students at stop.")
+        # if sum(student_moved_list) > 0:
+        # print("Not worth moving even though " + str(sum(student_moved_list)) + " students can be moved.")
+
+    for i in range(len(bus_stops)):
+        stop_id = bus_stops[i, 0]
+        students_at_stop = len(np.argwhere(students[:, 3] == stop_id))
+        bus_stops[i, 5] = students_at_stop
+
+    bus_stops = bus_stops[bus_stops[:, 5] > 0]
+    print("Average student walking distance before: " + str(pre_avg_walking_distance)
+          + ". No. bus stops = " + str(np.shape(distance_matrix_np)[0]))
+    print("Average student walking distance after: " + str(np.average(students[:, 4]))
+          + ". No. bus stops = " + str(len(bus_stops)))
+    bus_stops = average_walking_distance_to_stop(bus_stops, students)
+    students = students[:, 0:5]
+    # Drop columns that are wrong now
+    return bus_stops, students
 
 
 def student_reassignment_walking_matrix(bus_stops, students, walking_matrix):
@@ -439,7 +503,11 @@ def average_walking_distance_to_stop(bus_stops, students):
         avg = np.average(students_at_stop[:, 4])
         average_walking_distance.append(avg)
 
-    bus_stops = np.insert(bus_stops, 6, average_walking_distance, axis=1)
+    no_columns = np.shape(bus_stops)[1]
+    if no_columns == 7:
+        bus_stops[:, 6] = average_walking_distance
+    else:
+        bus_stops = np.insert(bus_stops, 6, average_walking_distance, axis=1)
     return bus_stops
 
 

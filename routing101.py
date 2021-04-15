@@ -247,7 +247,7 @@ def print_solution(data, manager, routing, solution):
                                                      route_load)
             plan_output += 'Distance of the route: {}m\n'.format(route_distance)
             plan_output += 'Load of the route: {}\n'.format(route_load)
-            print(plan_output)
+            #print(plan_output)
             total_distance += route_distance
             total_load += route_load
         else:
@@ -312,7 +312,7 @@ def calculate_arrival_times(routes):
 
 
 
-def calculate_student_travel_time(routes, students, walking_matrix):
+def calculate_student_travel_time(routes, students, bus_stops, walking_matrix):
     """
     Calculates each student's travel time to the school
     :param walking_matrix:
@@ -324,8 +324,10 @@ def calculate_student_travel_time(routes, students, walking_matrix):
     for i in range(len(students)):
         # For each student, get walking time to their stop
         students_assigned_stop = students[i, 3]
+        print(i)
         student_walking_distance = students[i, 4]
-        walking_matrix_index = np.argwhere(walking_matrix['distances'][i] == student_walking_distance)[0][0]
+        print(student_walking_distance)
+        walking_matrix_index = np.argwhere(bus_stops[:, 0] == students_assigned_stop)[0][0]
         walking_time_to_stop = walking_matrix['times'][i][walking_matrix_index]  # in minutes
         # Now have to get the distance travelled on the bus
         # This is: time at end of journey - time when students got on bus
