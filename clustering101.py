@@ -190,6 +190,7 @@ def add_extra_stops(students, max_stop_ID):
 
     return bus_stops
 
+
 def add_final_stops(students, max_stop_ID):
     """
     In this final method, any remaining students are assigned a stop directly on their co-ordinates which is
@@ -198,6 +199,16 @@ def add_final_stops(students, max_stop_ID):
     :param max_stop_ID:
     :return:
     """
+    # Create dummy stops with just one student at them
+    stop_IDs = range(int(max_stop_ID) + 1, (len(students) + int(max_stop_ID) + 1))
+    bus_stops = np.insert(students[:, [1, 2]], 0, stop_IDs, axis=1)
+    counts = [1] * len(students)
+    bus_stops = np.insert(bus_stops, 3, counts, axis=1)
+
+    # Send final stops to iterative search
+    bus_stops = snap_stops_to_roads_iterative_search(bus_stops)
+    return bus_stops
+
 
 def snap_stops_to_roads_iterative_search(new_stops):
     """
@@ -454,6 +465,7 @@ def student_reassignment_walking_matrix(bus_stops, students, walking_matrix):
 
     for i in range(len(students)):
         # This method only works as long as no stops have been dropped since the creation of the walking distance matrix
+        print(str(i) + " is the index being used for the np.min line that crashed.")
         closest_distance = np.min(walking_matrix['distances'][i])
         stop_index = np.argwhere(walking_matrix['distances'][i] == closest_distance)[0][0]
         stop_ID = bus_stops[stop_index, 0]
@@ -606,6 +618,7 @@ def stop_creation_loop(students):
     :param students:
     :return:
     """
+    print("lets go")
     max_stop_id = 100
     previous_bus_stops = np.array([])
     initial_students = students
@@ -613,9 +626,11 @@ def stop_creation_loop(students):
     convergence = False
     final_stops = []
     final_students = []
-    running_info = []
     i = 0
+
+    statistics = []  # will contain [no.loop, no. stops, avg walking distance, no. overs, time taken seconds]
     while not convergence:
+        start = time.time()
         i = i + 1
         print("iteration " + str(i))
         new_stops = add_extra_stops(students, max_stop_id)
@@ -635,6 +650,21 @@ def stop_creation_loop(students):
                 new_number_of_students_over_constraint == 0:
             # convergence: solution is stable OR no students over walking constraint
             convergence = True
+            # add final stops
+            max_stop_id = np.max(moved_stops_reassigned[:, 0])
+            final_round_stops = add_final_stops(overs, max_stop_id)
+            print("Adding " + str(len(final_round_stops)) + " stops to solution.")
+            print("New bus stops being combined with old.")
+            new_stops = np.concatenate((moved_stops_reassigned[:, 0:5], final_round_stops))
+            walking_matrix = route.student_stop_walking_distances(students, new_stops)
+            moved_stops_reassigned, students_reassigned = student_reassignment_walking_matrix(
+                new_stops, initial_students, walking_matrix)
+            end = time.time()
+            statistics.append(i)
+            statistics.append(len(moved_stops_reassigned))
+            statistics.append(np.average(students_reassigned[:, 4] >= 400))
+            statistics.append(len(overs))
+            statistics.append((end - start))
             final_stops = moved_stops_reassigned
             final_students = students_reassigned
         else:
@@ -643,5 +673,10 @@ def stop_creation_loop(students):
             previous_bus_stops = moved_stops_reassigned
             students = overs
             number_of_students_over_constraint = new_number_of_students_over_constraint
-            running_info.append((len(moved_stops_reassigned), len(overs)))
-    return final_stops, final_students, running_info
+            end = time.time()
+            statistics.append(i)
+            statistics.append(len(moved_stops_reassigned))
+            statistics.append(np.average(students_reassigned[:, 4] >= 400))
+            statistics.append(len(overs))
+            statistics.append((end - start))
+    return final_stops, final_students, statistics
