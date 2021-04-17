@@ -563,34 +563,88 @@ def sidewalk_check(way):
             # Sidewalk on secondary road - perhaps check for left/right
             '''Check for left right here if needed'''
             print('sidewalk on secondary, type: ' + way['sidewalk'])
-
+            return True
+    elif wayType == 'primary':
+        if 'sidewalk' in way:
+            # Sidewalk on secondary road - perhaps check for left/right
+            '''Check for left right here if needed'''
+            print('sidewalk on primary, type: ' + way['sidewalk'])
+            return True
     elif wayType == 'path':
         if 'foot' in way:
             # footway on path. Suitable for bus Stop
             print('sidewalk on path, type: ' + way['foot'])
+            return True
     elif wayType == 'footway':
         print('sidewalk on path, type: ' + way['highway'])
+        return True
     elif wayType == 'residential':
         if 'sidewalk' in way:
             # Sidewalk on secondary road - perhaps check for left/right
             '''Check for left right here if needed'''
             print('sidewalk on residential, type: ' + way['sidewalk'])
+            return True
     elif wayType == 'tertiary':
         if 'sidewalk' in way:
             # Sidewalk on secondary road - perhaps check for left/right
             '''Check for left right here if needed'''
             print('sidewalk on tertiary, type: ' + way['sidewalk'])
+            return True
     else:
         print('no sidewalk')
+        return False
 
 
-def footway_distance_check(coords, way):
+def sidewalk_check_stop(coords):
     """
-
+    Takes in a stop, and returns true if a sidewalk is present and false if not.
     :param coords:
-    :param way:
     :return:
     """
+    overpass_url = "http://overpass-api.de/api/interpreter"
+    pavement_string = ""
+    satisfied = False
+    while not satisfied:
+        try:
+            query = get_roads_sidewalk_query(coords)
+            response = requests.get(overpass_url, params={'data': query})
+            # print(response.json())
+            json_data = response.json()
+            if not json_data['elements']:
+                # no response, no suitable road, move out and try again
+                satisfied = True
+                print("ERROR. This shouldn't happen, as these co-ordinates have already returned positive")
+                pavement_string = "ERROR"
+                return pavement_string
+
+            else:
+                # \\TODO: Check for pavement
+                numberRoads = len(json_data['elements'])  # This minus one for last index
+                pavement = False
+                for i in range(0, numberRoads):
+                    currentRoad = json_data['elements'][i]['tags']
+                    result = sidewalk_check(currentRoad)
+                    if result:
+                        pavement = True
+                if pavement:
+                    pavement_string = "Present"
+                else:
+                    pavement_string = "Not Present"
+                satisfied = True
+                return pavement_string
+        except ValueError:
+            # Currently operating under the assumption that the API needs a second to breathe
+            # So I'm just going to try request it again and see what happens
+            print('Json Decode Error')
+
+
+def get_roads_sidewalk_query(user_input):
+    prefix = """[out:json][timeout:50];(way["highway"](around:"""  # this is string of syntex in 'Overpass QL' language
+    suffix = """););out body;"""  # this is string of syntex in 'Overpass QL' language
+    q = str(15) + ',' + str(user_input[0]) + ',' + str(
+        user_input[1])  # (radius,latitude,longitude) in a string from the user input
+    built_query = prefix + q + suffix  # arrange all above strings into a correct order to form complete query
+    return built_query
 
 
 def return_suitable_location_outSearch(coords):

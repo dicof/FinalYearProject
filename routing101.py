@@ -231,7 +231,7 @@ def print_solution(data, manager, routing, solution):
                 temp_route_load = route_load + data['students'][new_node_index]
                 route_distance += routing.GetArcCostForVehicle(
                     previous_index, index, vehicle_id)
-                print(str(previous_index) + ", " + str(index))
+                # print(str(previous_index) + ", " + str(index))
                 if previous_index >= max_index:
                     # Replace with depot
                     route_time += data['time_matrix'][0][index]
@@ -247,7 +247,7 @@ def print_solution(data, manager, routing, solution):
                                                      route_load)
             plan_output += 'Distance of the route: {}m\n'.format(route_distance)
             plan_output += 'Load of the route: {}\n'.format(route_load)
-            #print(plan_output)
+            print(plan_output)
             total_distance += route_distance
             total_load += route_load
         else:

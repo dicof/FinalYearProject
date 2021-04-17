@@ -465,7 +465,6 @@ def student_reassignment_walking_matrix(bus_stops, students, walking_matrix):
 
     for i in range(len(students)):
         # This method only works as long as no stops have been dropped since the creation of the walking distance matrix
-        print(str(i) + " is the index being used for the np.min line that crashed.")
         closest_distance = np.min(walking_matrix['distances'][i])
         stop_index = np.argwhere(walking_matrix['distances'][i] == closest_distance)[0][0]
         stop_ID = bus_stops[stop_index, 0]
@@ -618,7 +617,6 @@ def stop_creation_loop(students):
     :param students:
     :return:
     """
-    print("lets go")
     max_stop_id = 100
     previous_bus_stops = np.array([])
     initial_students = students
@@ -641,7 +639,7 @@ def stop_creation_loop(students):
             print("New bus stops being combined with old.")
             new_stops = np.concatenate((previous_bus_stops[:, 0:5], new_stops))
 
-        walking_matrix = route.student_stop_walking_distances(students, new_stops)
+        walking_matrix = route.student_stop_walking_distances(initial_students, new_stops)
         moved_stops_reassigned, students_reassigned = student_reassignment_walking_matrix(
             new_stops, initial_students, walking_matrix)
         overs = students_reassigned[students_reassigned[:, 4] >= 400]
@@ -651,18 +649,25 @@ def stop_creation_loop(students):
             # convergence: solution is stable OR no students over walking constraint
             convergence = True
             # add final stops
-            max_stop_id = np.max(moved_stops_reassigned[:, 0])
-            final_round_stops = add_final_stops(overs, max_stop_id)
-            print("Adding " + str(len(final_round_stops)) + " stops to solution.")
-            print("New bus stops being combined with old.")
-            new_stops = np.concatenate((moved_stops_reassigned[:, 0:5], final_round_stops))
-            walking_matrix = route.student_stop_walking_distances(students, new_stops)
-            moved_stops_reassigned, students_reassigned = student_reassignment_walking_matrix(
-                new_stops, initial_students, walking_matrix)
+            if new_number_of_students_over_constraint != 0:
+                # Need to do the final adding of overs.
+                print("Adding final stops on iteration " + str(i))
+                max_stop_id = np.max(moved_stops_reassigned[:, 0])
+                final_round_stops = add_final_stops(overs, max_stop_id)
+                print("Adding " + str(len(final_round_stops)) + " stops to solution.")
+                print("New bus stops being combined with old.")
+                new_stops = np.concatenate((moved_stops_reassigned[:, 0:5], final_round_stops))
+                print("Need to allow the graphhopper matrix time to recover before requesting again")
+                time.sleep(60)
+                print("Time over")
+                walking_matrix = route.student_stop_walking_distances(initial_students, new_stops)
+                moved_stops_reassigned, students_reassigned = student_reassignment_walking_matrix(
+                    new_stops, initial_students, walking_matrix)
+
             end = time.time()
             statistics.append(i)
             statistics.append(len(moved_stops_reassigned))
-            statistics.append(np.average(students_reassigned[:, 4] >= 400))
+            statistics.append(np.average(students_reassigned[:, 4]))
             statistics.append(len(overs))
             statistics.append((end - start))
             final_stops = moved_stops_reassigned
@@ -676,7 +681,9 @@ def stop_creation_loop(students):
             end = time.time()
             statistics.append(i)
             statistics.append(len(moved_stops_reassigned))
-            statistics.append(np.average(students_reassigned[:, 4] >= 400))
+            statistics.append(np.average(students_reassigned[:, 4]))
             statistics.append(len(overs))
             statistics.append((end - start))
+
+    statistics = np.array(statistics)
     return final_stops, final_students, statistics

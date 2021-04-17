@@ -3,6 +3,7 @@ import pandas as pd
 import clustering101 as cluster
 import routing101 as route
 import time
+import busStopCheck as bsc
 
 path = "C:\\Users\\diarm\\Documents\\MSISS 4TH YEAR\\FYP\\Notes and Misc\\6670Students.csv"
 # These addresses are stored in 'dataset'
@@ -12,68 +13,82 @@ students = dataset_np[:, [1, 2, 3]]
 
 #bus_stops, students, stats = cluster.stop_creation_loop(students)
 
-print("lets go")
-max_stop_id = 100
-previous_bus_stops = np.array([])
-initial_students = students
-number_of_students_over_constraint = -1
-convergence = False
-final_stops = []
-final_students = []
-i = 0
+# Step One: stop creation loop
+bus_stops, students, statistics = cluster.stop_creation_loop(students)
 
-# Get Rid Of This After Test
-walking_matrix = []
+# Step Two: stop amalgamation
 
-statistics = []  # will contain [no.loop, no. stops, avg walking distance, no. overs, time taken seconds]
-while not convergence:
-    start = time.time()
-    i = i + 1
-    print("iteration " + str(i))
-    new_stops = cluster.add_extra_stops(students, max_stop_id)
-    print("Adding " + str(len(new_stops)) + " stops to solution.")
-    new_stops = cluster.snap_stops_to_roads_iterative_search(new_stops)
-    if previous_bus_stops.size != 0:
-        # need to combine new bus stops with previous bus stops
-        print("New bus stops being combined with old.")
-        new_stops = np.concatenate((previous_bus_stops[:, 0:5], new_stops))
+pre_walking_matrix = route.student_stop_walking_distances(students, bus_stops)
+print("Need to allow the graphhopper matrix time to recover before requesting again")
+time.sleep(60)
+print("Time over")
+pre_distance_matrix = route.graphhopper_matrix(bus_stops)
+print("Need to allow the graphhopper matrix time to recover before requesting again")
+time.sleep(60)
+print("Time over")
+amalg_stops, amalg_students = cluster.new_stop_amalgamation(students, bus_stops, pre_distance_matrix, pre_walking_matrix)
 
-    walking_matrix = route.student_stop_walking_distances(students, new_stops)
-    moved_stops_reassigned, students_reassigned = cluster.student_reassignment_walking_matrix(
-        new_stops, initial_students, walking_matrix)
-    overs = students_reassigned[students_reassigned[:, 4] >= 400]
-    new_number_of_students_over_constraint = len(overs)
-    if new_number_of_students_over_constraint == number_of_students_over_constraint or \
-            new_number_of_students_over_constraint == 0:
-        # convergence: solution is stable OR no students over walking constraint
-        convergence = True
-        # add final stops
-        max_stop_id = np.max(moved_stops_reassigned[:, 0])
-        final_round_stops = cluster.add_final_stops(overs, max_stop_id)
-        print("Adding " + str(len(final_round_stops)) + " stops to solution.")
-        print("New bus stops being combined with old.")
-        new_stops = np.concatenate((moved_stops_reassigned[:, 0:5], final_round_stops))
-        walking_matrix = route.student_stop_walking_distances(students, new_stops)
-        moved_stops_reassigned, students_reassigned = cluster.student_reassignment_walking_matrix(
-            new_stops, initial_students, walking_matrix)
-        end = time.time()
-        statistics.append(i)
-        statistics.append(len(moved_stops_reassigned))
-        statistics.append(np.average(students_reassigned[:, 4] >= 400))
-        statistics.append(len(overs))
-        statistics.append((end - start))
-        final_stops = moved_stops_reassigned
-        final_students = students_reassigned
-    else:
-        # solution might benefit from going again
-        max_stop_id = np.max(moved_stops_reassigned[:, 0])
-        previous_bus_stops = moved_stops_reassigned
-        students = overs
-        number_of_students_over_constraint = new_number_of_students_over_constraint
-        end = time.time()
-        statistics.append(i)
-        statistics.append(len(moved_stops_reassigned))
-        statistics.append(np.average(students_reassigned[:, 4] >= 400))
-        statistics.append(len(overs))
-        statistics.append((end - start))
+# Step Three: OR-Tools Routing
+print("Need to allow the graphhopper matrix time to recover before requesting again")
+time.sleep(60)
+print("Time over")
+pre_routing_matrix = route.graphhopper_matrix_depot(bus_stops)
+pre_routes = route.ortools_routing(bus_stops, pre_routing_matrix)
+print("Need to allow the graphhopper matrix time to recover before requesting again")
+time.sleep(60)
+print("Time over")
+post_routing_matrix = route.graphhopper_matrix_depot(amalg_stops)
+post_routes = route.ortools_routing(amalg_stops, post_routing_matrix)
+print("Need to allow the graphhopper matrix time to recover before requesting again")
+time.sleep(60)
+print("Time over")
+# Step Four: Add Arrival times to students
+
+pre_students = route.calculate_student_travel_time(pre_routes, students, bus_stops, pre_walking_matrix)
+
+post_walking_matrix = route.student_stop_walking_distances(amalg_students, amalg_stops)
+amalg_students = route.calculate_student_travel_time(post_routes, amalg_students, amalg_stops, post_walking_matrix)
+
+# Step Five: Save everthing to csvs
+pre_final_response = route.turn_routes_into_csv_visualisation_form(pre_routes, bus_stops)
+pre_final_response.to_csv("17_April_Final_Response_Pre_Amalg.csv", index=False)
+
+post_final_response = route.turn_routes_into_csv_visualisation_form(post_routes, amalg_stops)
+post_final_response.to_csv("17_April_Final_Response_Post_Amalg.csv", index=False)
+
+col_names_stops = ["Stop ID",
+                   "Lat", "Lon", "Distance Moved", "Road Type", "Students At Stop", "Average Walking Distance"]
+col_names_students = ["Student Number", "Lat", "Lon", "Assigned Stop", "Walking Distance (m)", "Travel Time (s)"]
+
+pre_amalg_stops_PD = pd.DataFrame(bus_stops)
+pre_amalg_stops_PD.columns = col_names_stops
+post_amalg_stops_PD = pd.DataFrame(amalg_stops)
+post_amalg_stops_PD.columns = col_names_stops
+
+pre_students_PD = pd.DataFrame(pre_students)
+pre_students_PD.columns = col_names_students
+post_students_PD = pd.DataFrame(amalg_students)
+post_students_PD.columns = col_names_students
+
+statistics_PD = pd.DataFrame(statistics)
+statistics_PD.to_csv("17_April_statistics.csv")
+
+pre_amalg_stops_PD.to_csv("17_April_pre_stops.csv", index=False)
+post_amalg_stops_PD.to_csv("17_April_post_stops.csv", index=False)
+
+pre_students_PD.to_csv("17_April_pre_students.csv", index=False)
+post_students_PD.to_csv("17_April_post_students.csv", index=False)
+
+
+
+# Lastly for fun: sidewalk check loop
+pavements = []
+for i in range(len(amalg_stops)):
+    coords = amalg_stops[i, [1, 2]]
+    pavement = bsc.sidewalk_check_stop(coords)
+    pavements.append(pavement)
+
+pavements = np.array(pavements)
+
+# One Step left: Change the arrival times on responses to time format on the excel.
 
