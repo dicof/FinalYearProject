@@ -12,8 +12,7 @@ Created on Tue Feb  9 01:24:50 2021
 # suitable road - what classifications are suitable for stop
 
 
-import overpy  # to import the overpy module
-import pandas as pd  # to import pandas library
+import pandas as pd
 import numpy as np
 import json  # to import json
 import requests  # to import requests
@@ -685,7 +684,7 @@ def return_suitable_location_outSearch(coords):
                     search_distance = search_distance + incrementer
                     print("Extending search distance to " + str(search_distance))
             else:
-                # A response: Check for secondary, then tertiary, then two lane residential
+                # A response: Check for primary, then secondary, then tertiary, then two lane residential
                 # \\TODO: Check for pavement
                 number_roads = len(json_data['elements'])  # This minus one for last index
                 priority_measure = 0

@@ -279,6 +279,7 @@ def turn_indexes_to_stops(solution_set, bus_stops):
         solution_set_stop_ids.append(route_numpy)
     return solution_set_stop_ids
 
+
 def calculate_arrival_times(routes):
     """
     Adds arrival times to the routes, working backwards so that each bus arrives at the school at 9:20
@@ -298,23 +299,22 @@ def calculate_arrival_times(routes):
         number_of_stops = len(current_route)
         if number_of_stops != 1:
             # unused vehicles
-            arrival_times = [0]*number_of_stops
+            arrival_times = [0] * number_of_stops
             current_route = np.insert(current_route, 4, arrival_times, axis=1)
-            for j in range(number_of_stops-1, 0, -1):
+            for j in range(number_of_stops - 1, 0, -1):
                 # arrival time is seconds since midnight, which will be adjusted as the loop goes on
                 current_route[j, 4] = seconds_since_midnight_at_arrival
-                difference = current_route[j][2]-current_route[j-1][2]
+                difference = current_route[j][2] - current_route[j - 1][2]
                 seconds_since_midnight_at_arrival = seconds_since_midnight_at_arrival - difference
         finished_routes.append(current_route)
 
     return finished_routes
 
 
-
-
 def calculate_student_travel_time(routes, students, bus_stops, walking_matrix):
     """
     Calculates each student's travel time to the school
+    :param bus_stops:
     :param walking_matrix:
     :param routes:
     :param students:
@@ -328,7 +328,7 @@ def calculate_student_travel_time(routes, students, bus_stops, walking_matrix):
         student_walking_distance = students[i, 4]
         print(student_walking_distance)
         walking_matrix_index = np.argwhere(bus_stops[:, 0] == students_assigned_stop)[0][0]
-        walking_time_to_stop = walking_matrix['times'][i][walking_matrix_index]  # in minutes
+        walking_time_to_stop = walking_matrix['times'][i][walking_matrix_index]  # in seconds
         # Now have to get the distance travelled on the bus
         # This is: time at end of journey - time when students got on bus
         found = False
@@ -377,7 +377,7 @@ def turn_routes_into_csv_visualisation_form(routes, bus_stops):
                 if current_stop[1] != 0:
                     # this is to exclude the depot, which isn't needed in the output
                     response.append(vehicle_id)
-                    response.append(j) # sequence
+                    response.append(j)  # sequence
                     # Need to get lat and lon of stop using stop id
                     current_stop_id = current_stop[0]
                     if current_stop_id != 'depot':
@@ -393,9 +393,9 @@ def turn_routes_into_csv_visualisation_form(routes, bus_stops):
                         lon = -63.69856
                         response.append(lat)
                         response.append(lon)
-                    response.append(current_stop[1]) # vehicle cumulative distance
-                    response.append(current_stop[3]) # number students on vehicle
-                    response.append(current_stop[4]/86400) # number seconds since midnight \\TODO: CHange this
+                    response.append(current_stop[1])  # vehicle cumulative distance
+                    response.append(current_stop[3])  # number students on vehicle
+                    response.append(current_stop[4] / 86400)  # number seconds since midnight \\TODO: CHange this
                     # distance to school
                     response.append(600)
                     # stop number

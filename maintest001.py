@@ -5,19 +5,21 @@ import routing101 as route
 import time
 import busStopCheck as bsc
 
+np.set_printoptions(suppress=True)
+
 path = "C:\\Users\\diarm\\Documents\\MSISS 4TH YEAR\\FYP\\Notes and Misc\\6670Students.csv"
 # These addresses are stored in 'dataset'
 dataset = pd.read_csv(path)
 dataset_np = np.array(dataset)
 students = dataset_np[:, [1, 2, 3]]
 
-#bus_stops, students, stats = cluster.stop_creation_loop(students)
-
 # Step One: stop creation loop
 bus_stops, students, statistics = cluster.stop_creation_loop(students)
 
 # Step Two: stop amalgamation
-
+print("Need to allow the graphhopper matrix time to recover before requesting again")
+time.sleep(60)
+print("Time over")
 pre_walking_matrix = route.student_stop_walking_distances(students, bus_stops)
 print("Need to allow the graphhopper matrix time to recover before requesting again")
 time.sleep(60)
@@ -26,7 +28,8 @@ pre_distance_matrix = route.graphhopper_matrix(bus_stops)
 print("Need to allow the graphhopper matrix time to recover before requesting again")
 time.sleep(60)
 print("Time over")
-amalg_stops, amalg_students = cluster.new_stop_amalgamation(students, bus_stops, pre_distance_matrix, pre_walking_matrix)
+amalg_stops, amalg_students = cluster.new_stop_amalgamation(
+    students, bus_stops, pre_distance_matrix, pre_walking_matrix)
 
 # Step Three: OR-Tools Routing
 print("Need to allow the graphhopper matrix time to recover before requesting again")
@@ -50,7 +53,14 @@ post_walking_matrix = route.student_stop_walking_distances(amalg_students, amalg
 amalg_students = route.calculate_student_travel_time(post_routes, amalg_students, amalg_stops, post_walking_matrix)
 
 # Step Five: Save everthing to csvs
+colnames_response = ["vehicle_id", "sequence",
+                     "latitude", "longitude",
+                     "vehicle_cumul_dist",
+                     "cumul_demands", "arrival_time",
+                     "dist_to_school", "stop_number",
+                     "nodes"]
 pre_final_response = route.turn_routes_into_csv_visualisation_form(pre_routes, bus_stops)
+pre_final_response.columns = colnames_response
 pre_final_response.to_csv("17_April_Final_Response_Pre_Amalg.csv", index=False)
 
 post_final_response = route.turn_routes_into_csv_visualisation_form(post_routes, amalg_stops)
