@@ -41,7 +41,7 @@ colnames_response = ["vehicle_id", "sequence",
 col_names_stops = ["Stop ID",
                    "Lat", "Lon", "Distance Moved", "Road Type", "Students At Stop", "Average Walking Distance"]
 col_names_students = ["Student Number", "Lat", "Lon", "Assigned Stop", "Walking Distance (m)", "Travel Time (s)"]
-pre_final_response = route.turn_routes_into_csv_visualisation_form(pre_routes, bus_stops)
+pre_final_response = route.routes_to_csv(pre_routes, bus_stops)
 pre_final_response.columns = colnames_response
 pre_final_response.to_csv("19_April_Final_Response_Pre_Amalg.csv", index=False)
 
@@ -58,7 +58,7 @@ pre_amalg_stops_PD.to_csv("19_April_pre_stops.csv", index=False)
 pre_students_PD.to_csv("19_April_pre_students.csv", index=False)
 
 # Amalgamate stops and do routing again
-amalg_stops, amalg_students = cluster.new_stop_amalgamation(
+amalg_stops, amalg_students = cluster.stop_amalgamation(
     students, bus_stops, pre_distance_matrix, pre_walking_matrix)
 
 post_routing_matrix = route.graphhopper_matrix_depot(amalg_stops)
@@ -74,7 +74,7 @@ print("Time over")
 
 amalg_students = route.calculate_student_travel_time(post_routes, amalg_students, amalg_stops, post_walking_matrix)
 
-post_final_response = route.turn_routes_into_csv_visualisation_form(post_routes, amalg_stops)
+post_final_response = route.routes_to_csv(post_routes, amalg_stops)
 post_final_response.to_csv("19_April_Final_Response_Post_Amalg.csv", index=False)
 post_amalg_stops_PD = pd.DataFrame(amalg_stops)
 post_amalg_stops_PD.columns = col_names_stops

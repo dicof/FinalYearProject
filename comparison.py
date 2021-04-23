@@ -29,6 +29,6 @@ overs = post_students[post_students[:, 4] > 400]
 max_ID = np.max(post_bus_stops[:, 0])
 
 walking_matrix = route.student_stop_walking_distances(students, bus_stops)
-test_stops, test_students = cluster.student_reassignment_walking_matrix(pre_bus_stops, students, walking_matrix)
+test_stops, test_students = cluster.student_reassignment(pre_bus_stops, students, walking_matrix)
 
 

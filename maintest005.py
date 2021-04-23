@@ -26,14 +26,14 @@ while not convergence:
     i = i + 1
     print("iteration " + str(i))
     new_stops = cluster.add_extra_stops(students, max_stop_id)
-    new_stops = cluster.snap_stops_to_roads_iterative_search(new_stops)
+    new_stops = cluster.snap_stops_to_roads(new_stops)
     if previous_bus_stops.size != 0:
         # need to combine new bus stops with previous bus stops
         print("New bus stops being combined with old.")
         new_stops = np.concatenate((previous_bus_stops[:, 0:5], new_stops))
 
     walking_matrix = route.student_stop_walking_distances(initial_students, new_stops)
-    moved_stops_reassigned, students_reassigned = cluster.student_reassignment_walking_matrix(
+    moved_stops_reassigned, students_reassigned = cluster.student_reassignment(
         new_stops, initial_students, walking_matrix)
     overs = students_reassigned[students_reassigned[:, 4] >= 400]
     new_number_of_students_over_constraint = len(overs)

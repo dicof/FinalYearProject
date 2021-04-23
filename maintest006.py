@@ -23,7 +23,7 @@ time.sleep(60)
 print("Time over")
 distance_matrix = route.graphhopper_matrix(bus_stops)
 distance_matrix_np = np.array(distance_matrix['distances'])
-new_stops, new_students = cluster.new_stop_amalgamation(students, bus_stops, distance_matrix, walking_matrix)
+new_stops, new_students = cluster.stop_amalgamation(students, bus_stops, distance_matrix, walking_matrix)
 
 
 """

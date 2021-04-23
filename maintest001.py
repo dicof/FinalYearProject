@@ -28,7 +28,7 @@ pre_distance_matrix = route.graphhopper_matrix(bus_stops)
 print("Need to allow the graphhopper matrix time to recover before requesting again")
 time.sleep(60)
 print("Time over")
-amalg_stops, amalg_students = cluster.new_stop_amalgamation(
+amalg_stops, amalg_students = cluster.stop_amalgamation(
     students, bus_stops, pre_distance_matrix, pre_walking_matrix)
 
 # Step Three: OR-Tools Routing
@@ -59,11 +59,11 @@ colnames_response = ["vehicle_id", "sequence",
                      "cumul_demands", "arrival_time",
                      "dist_to_school", "stop_number",
                      "nodes"]
-pre_final_response = route.turn_routes_into_csv_visualisation_form(pre_routes, bus_stops)
+pre_final_response = route.routes_to_csv(pre_routes, bus_stops)
 pre_final_response.columns = colnames_response
 pre_final_response.to_csv("17_April_Final_Response_Pre_Amalg.csv", index=False)
 
-post_final_response = route.turn_routes_into_csv_visualisation_form(post_routes, amalg_stops)
+post_final_response = route.routes_to_csv(post_routes, amalg_stops)
 post_final_response.to_csv("17_April_Final_Response_Post_Amalg.csv", index=False)
 
 col_names_stops = ["Stop ID",

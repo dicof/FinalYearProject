@@ -357,7 +357,7 @@ def calculate_student_travel_time(routes, students, bus_stops, walking_matrix):
     return students
 
 
-def turn_routes_into_csv_visualisation_form(routes, bus_stops):
+def routes_to_csv(routes, bus_stops):
     """
     This function will turn the routes into a form that can be visualised using Garry's prototype visualisation
     Colnames: vehicle_id, sequence, lat, lon, vehicle_cumul_dist, cumul_demands, arrival_time
